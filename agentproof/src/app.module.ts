@@ -13,7 +13,8 @@ import { SystemHealthCheck } from './health/system.health.js';
   module: AppModule,
   server: {
     name: 'agentproof',
-    version: '1.0.0'
+    version: '1.0.0',
+    protocolVersion: 'legacy'
   },
   logging: {
     level: 'info'

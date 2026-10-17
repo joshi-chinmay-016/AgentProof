@@ -110,15 +110,19 @@ export class EvidenceAdapter {
       return JSON.stringify(value);
     }
 
+    if (value instanceof Date) {
+      return JSON.stringify(value.toISOString());
+    }
+
     if (Array.isArray(value)) {
       return '[' + value.map((item) => this.canonicalizeJson(item)).join(',') + ']';
     }
 
     const obj = value as Record<string, unknown>;
     const sortedKeys = Object.keys(obj).sort();
-    const entries = sortedKeys.map(
-      (key) => `${JSON.stringify(key)}:${this.canonicalizeJson(obj[key])}`
-    );
+    const entries = sortedKeys
+      .filter((key) => obj[key] !== undefined)
+      .map((key) => `${JSON.stringify(key)}:${this.canonicalizeJson(obj[key])}`);
 
     return '{' + entries.join(',') + '}';
   }

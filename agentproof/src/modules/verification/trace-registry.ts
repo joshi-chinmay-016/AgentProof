@@ -46,6 +46,11 @@ export class InMemoryTraceRegistry implements ITraceRegistry {
     if (!trace || !trace.traceId) {
       throw new Error('Cannot store trace: traceId is required.');
     }
+    if (this.storage.has(trace.traceId)) {
+      throw new Error(
+        `Trace with ID [${trace.traceId}] already exists. Verification traces are immutable audit records and cannot be overwritten.`
+      );
+    }
     // Store deep clone to guarantee immutability
     this.storage.set(trace.traceId, JSON.parse(JSON.stringify(trace)));
   }

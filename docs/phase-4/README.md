@@ -361,8 +361,9 @@ If the trace does not exist or tenant context mismatches:
 
 1. **Verdict $\ne$ Operational Error:** A verification outcome of `FAIL` or `INCONCLUSIVE` is a completely successful verification computation. The tool returns status `'success'` with `overallVerdict: 'FAIL'`. Operational errors are reserved strictly for protocol, validation, or datastore faults.
 2. **Action Claims $\ne$ Evidence:** The `action` argument represents what the agent *claims* happened. The `evidence` argument represents independent observations. `VerificationEngine` evaluates only evidence to reach its verdict.
-3. **Trace Immutability:** Traces are captured as deep-cloned immutable records at the moment of evaluation. Callers cannot tamper with trace history.
+3. **Trace Immutability & Write-Once Integrity:** Traces are captured as deep-cloned immutable records at the moment of evaluation. `InMemoryTraceRegistry` strictly enforces write-once immutability; attempting to overwrite an existing trace ID throws an error.
 4. **Tenant Isolation:** When a caller queries a trace specifying a `tenantId`, the registry strictly verifies that the trace target matches that tenant. Cross-tenant reads are rejected.
+5. **Evidence Digest Verification:** If a caller supplies an `integrityHash` on evidence, the controller validates it against the canonical SHA-256 digest of `observedPayload`, preventing tampered evidence from entering the verification pipeline.
 
 ---
 
@@ -370,29 +371,35 @@ If the trace does not exist or tenant context mismatches:
 
 All commands are executed from the application directory (`C:\agentproof\agentproof`):
 
-### 1. Run Complete Automated Test Suite (Phases 1–4)
+### 1. Run Complete Automated Test Suite (Phases 1–4 + Audit)
 ```bash
 npm test
 ```
-Executes all 20 test files and 115 passing tests across core, simulation, and MCP protocol layers.
+Executes all 21 test files and 121 passing tests across core, simulation, and MCP protocol layers.
 
-### 2. Run Production Build
+### 2. Run Genuine MCP Protocol Smoke Test
+```bash
+node scripts/protocol-smoke-test.mjs
+```
+Spawns the built server subprocess over STDIO, connects via the official `@modelcontextprotocol/sdk` client, executes JSON-RPC handshake initialization, lists tools, calls all four tools (`list_scenarios`, `run_scenario`, `inspect_trace`, `verify_outcome`), and cleanly terminates.
+
+### 3. Run Production Build
 ```bash
 npm run build
 ```
 Compiles TypeScript and bundles NitroStack widgets to `dist/`.
 
-### 3. Start MCP Server Locally
+### 4. Start MCP Server Locally
 ```bash
 npm start
 ```
-Starts the live MCP server over STDIO (or dual STDIO + HTTP transport in production).
+Starts the live MCP server over STDIO (using the official MCP SDK server with `protocolVersion: 'legacy'` for 100% interoperability with all MCP clients).
 
 ---
 
 ## 6. Current Limitations & Scope Boundaries
 
 1. **In-Memory Trace Storage:** Traces are stored in-process via `InMemoryTraceRegistry`. They do not persist across process restarts.
-2. **Caller-Supplied Tenant Context:** In the current phase, `tenantId` is an execution context boundary, not a cryptographically verified OAuth/JWT claim. Production token-based authentication remains out of scope.
+2. **Caller-Supplied Tenant Context:** In the current phase, `tenantId` is an execution context boundary, not a cryptographically verified OAuth/JWT claim. Production token-based authentication remains out of scope for Phase 4.
 3. **Simulation Boundary:** `run_scenario` executes within the in-memory simulated environment. It does not touch real-world third-party billing providers.
 4. **No LLM in Decision Path:** Verdicts are 100% deterministic and mathematical.

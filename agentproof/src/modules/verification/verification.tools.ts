@@ -45,7 +45,7 @@ export class VerificationTools {
   private readonly verifier: IVerifier;
   private readonly traceRegistry: ITraceRegistry;
   private readonly scenarioCatalog: ScenarioCatalog;
-  private readonly scenarioRunner: ScenarioRunner;
+  private readonly scenarioRunner?: ScenarioRunner;
   private readonly evidenceAdapter: EvidenceAdapter;
 
   constructor(
@@ -57,8 +57,7 @@ export class VerificationTools {
     this.verifier = verifier ?? new VerificationEngine();
     this.traceRegistry = traceRegistry ?? defaultTraceRegistry;
     this.scenarioCatalog = scenarioCatalog ?? defaultScenarioCatalog;
-    this.scenarioRunner =
-      scenarioRunner ?? new ScenarioRunner({ verifier: this.verifier });
+    this.scenarioRunner = scenarioRunner;
     this.evidenceAdapter = new EvidenceAdapter();
   }
 
@@ -132,8 +131,16 @@ export class VerificationTools {
     for (let i = 0; i < input.evidence.length; i++) {
       const raw = input.evidence[i];
       const observedAt = raw.observedAt ?? new Date().toISOString();
-      const integrityHash =
-        raw.integrityHash ?? this.evidenceAdapter.computePayloadHash(raw.observedPayload);
+      const computedHash = this.evidenceAdapter.computePayloadHash(raw.observedPayload);
+
+      if (raw.integrityHash && raw.integrityHash !== computedHash) {
+        throw new Error(
+          `Integrity hash mismatch on evidence item [${raw.evidenceId ?? i + 1}]: ` +
+          `supplied hash [${raw.integrityHash}] does not match computed SHA-256 digest [${computedHash}] of observedPayload.`
+        );
+      }
+
+      const integrityHash = computedHash;
 
       const ev = EvidenceSchema.parse({
         evidenceId: raw.evidenceId ?? `ev-${i + 1}-${crypto.randomUUID().slice(0, 6)}`,
@@ -260,7 +267,8 @@ export class VerificationTools {
       );
     }
 
-    const executionResult = await this.scenarioRunner.run(scenario);
+    const runner = this.scenarioRunner ?? new ScenarioRunner({ verifier: this.verifier });
+    const executionResult = await runner.run(scenario);
 
     // Save trace into registry for subsequent inspection
     this.traceRegistry.save(executionResult.trace);
