@@ -56,6 +56,16 @@ import {
   ListScenariosInputSchema,
   ListScenariosInput,
 } from './schemas/list-scenarios.schema.js';
+import {
+  IIntegrationRegistry,
+  defaultIntegrationRegistry,
+  ISecretProvider,
+  IPostgresDriver,
+  RestApiStateReader,
+  S3ObjectStateReader,
+  PostgresStateReader,
+  ExternalEvidenceAdapter,
+} from '../../observation/index.js';
 
 export interface VerificationToolsOptions {
   readonly verifier?: IVerifier;
@@ -66,6 +76,9 @@ export interface VerificationToolsOptions {
   readonly identityProvider?: IIdentityProvider;
   readonly authorizationService?: IAuthorizationService;
   readonly evidenceTrustValidator?: EvidenceTrustValidator;
+  readonly integrationRegistry?: IIntegrationRegistry;
+  readonly secretProvider?: ISecretProvider;
+  readonly postgresDriver?: IPostgresDriver;
 }
 
 export class VerificationTools {
@@ -78,6 +91,10 @@ export class VerificationTools {
   private readonly authorizationService: IAuthorizationService;
   private readonly evidenceTrustValidator: EvidenceTrustValidator;
   private readonly evidenceAdapter: EvidenceAdapter;
+  private readonly integrationRegistry: IIntegrationRegistry;
+  private readonly secretProvider?: ISecretProvider;
+  private readonly postgresDriver?: IPostgresDriver;
+  private readonly externalEvidenceAdapter: ExternalEvidenceAdapter;
 
   constructor(
     verifierOrOptions?: IVerifier | VerificationToolsOptions,
@@ -87,7 +104,8 @@ export class VerificationTools {
     identityProvider?: IIdentityProvider,
     authorizationService?: IAuthorizationService,
     traceRepository?: ITraceRepository,
-    evidenceTrustValidator?: EvidenceTrustValidator
+    evidenceTrustValidator?: EvidenceTrustValidator,
+    integrationRegistry?: IIntegrationRegistry
   ) {
     const isOptions = verifierOrOptions && typeof (verifierOrOptions as any).verify !== 'function';
     const opts: VerificationToolsOptions = isOptions ? (verifierOrOptions as VerificationToolsOptions) : {};
@@ -101,6 +119,11 @@ export class VerificationTools {
     this.authorizationService = (isOptions ? opts.authorizationService : authorizationService) ?? new DefaultAuthorizationService();
     this.evidenceTrustValidator = (isOptions ? opts.evidenceTrustValidator : evidenceTrustValidator) ?? new EvidenceTrustValidator();
     this.evidenceAdapter = new EvidenceAdapter();
+
+    this.integrationRegistry = (isOptions ? opts.integrationRegistry : integrationRegistry) ?? defaultIntegrationRegistry;
+    this.secretProvider = isOptions ? opts.secretProvider : undefined;
+    this.postgresDriver = isOptions ? opts.postgresDriver : undefined;
+    this.externalEvidenceAdapter = new ExternalEvidenceAdapter();
 
     // Trace repository resolution
     if (isOptions && opts.traceRepository) {
@@ -261,6 +284,87 @@ export class VerificationTools {
       }) as Evidence;
 
       formattedEvidence.push(ev);
+    }
+
+    // 5b. Independently observe state from trusted external integration if specified
+    if (validatedInput.integrationId) {
+      const integration = this.integrationRegistry.getById(
+        validatedInput.integrationId,
+        effectiveTenant
+      );
+
+      if (!integration) {
+        throw new TenantAccessDeniedError(
+          `Integration [${validatedInput.integrationId}] was not found in authorized tenant scope.`
+        );
+      }
+
+      if (!integration.enabled) {
+        throw new Error(`Integration [${validatedInput.integrationId}] is currently disabled.`);
+      }
+
+      let reader = this.integrationRegistry.getReader?.(
+        validatedInput.integrationId,
+        effectiveTenant
+      );
+
+      if (!reader) {
+        if (integration.type === 'REST_API') {
+          reader = new RestApiStateReader(integration, { secretProvider: this.secretProvider });
+        } else if (integration.type === 'S3_STORAGE') {
+          reader = new S3ObjectStateReader(integration, { secretProvider: this.secretProvider });
+        } else if (integration.type === 'POSTGRES') {
+          reader = new PostgresStateReader(integration, {
+            secretProvider: this.secretProvider,
+            driver: this.postgresDriver,
+          });
+        }
+        if (reader) {
+          this.integrationRegistry.registerReader?.(reader);
+        }
+      }
+
+      if (!reader) {
+        throw new Error(
+          `Failed to initialize reader for integration type [${integration.type}].`
+        );
+      }
+
+      // Register the integration's sourceId with EvidenceTrustValidator
+      this.evidenceTrustValidator.registerTrustedSource(integration.integrationId);
+
+      // Perform independent external state observation
+      const observationRecord = await reader.readState(target);
+
+      // Convert observation to Evidence with failure preservation
+      const externalEvidence = this.externalEvidenceAdapter.toEvidence(observationRecord, {
+        includeFailureRecord: true,
+      });
+
+      if (externalEvidence) {
+        // Validate external evidence through EvidenceTrustValidator
+        const trustReport = this.evidenceTrustValidator.validate(
+          externalEvidence,
+          target,
+          request.policy,
+          actionRecord
+        );
+
+        const combinedLimitations = Array.from(
+          new Set([...(externalEvidence.limitations ?? []), ...trustReport.limitations])
+        );
+
+        const validatedExtEv = EvidenceSchema.parse({
+          ...externalEvidence,
+          limitations: combinedLimitations,
+          provenance: {
+            ...externalEvidence.provenance,
+            trustLevel: trustReport.trustLevel,
+          },
+        }) as Evidence;
+
+        formattedEvidence.push(validatedExtEv);
+      }
     }
 
     // 6. Execute verification through deterministic Phase 2 engine

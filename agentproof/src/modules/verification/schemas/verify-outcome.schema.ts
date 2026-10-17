@@ -91,6 +91,7 @@ export const PolicyInputSchema = z.object({
 export const VerifyOutcomeInputSchema = z.object({
   requestId: z.string().optional().describe('Unique request identifier (auto-generated if omitted)'),
   tenantId: z.string().optional().describe('Optional tenant context scoping the verification'),
+  integrationId: z.string().optional().describe('Optional ID of a trusted external integration in the integration registry'),
   target: TargetSchema.describe('Target resource to be verified'),
   intent: IntentSchema.describe('The operation intent and expected changes'),
   action: ActionInputSchema.optional().describe('Claimed action record from the agent'),

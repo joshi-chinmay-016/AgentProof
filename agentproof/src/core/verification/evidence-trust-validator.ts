@@ -57,6 +57,19 @@ export class EvidenceTrustValidator {
   }
 
   /**
+   * Registers a trusted source identifier at runtime (e.g. from validated integration registry).
+   */
+  public registerTrustedSource(sourceId: string): void {
+    if (this.config.trustedSourceIds instanceof Set) {
+      (this.config.trustedSourceIds as Set<string>).add(sourceId);
+    } else {
+      const updated = new Set(this.config.trustedSourceIds);
+      updated.add(sourceId);
+      (this.config as any).trustedSourceIds = updated;
+    }
+  }
+
+  /**
    * Validates an individual Evidence item.
    */
   public validate(

@@ -60,6 +60,32 @@ export class ConditionEvaluator {
       };
     }
 
+    // Check for reader error or observation failure
+    const failedObservation = matchingEvidence.find((e) =>
+      e.observationStatus === 'ERROR' ||
+      (e.limitations && (
+        e.limitations.includes('OBSERVATION_FAILED_READ_ERROR') ||
+        e.limitations.includes('READER_TIMEOUT') ||
+        e.limitations.includes('READER_ERROR')
+      ))
+    );
+
+    if (failedObservation) {
+      const isTimeout =
+        failedObservation.limitations?.includes('READER_TIMEOUT') ||
+        failedObservation.limitations?.includes('TIMEOUT');
+      return {
+        conditionId: condition.id,
+        description: condition.description,
+        verdict: 'INCONCLUSIVE',
+        reasonCode: isTimeout ? ReasonCodes.INC_READER_TIMEOUT : ReasonCodes.INC_READER_ERROR,
+        explanation: `Observation failed for target resource: ${failedObservation.limitations?.join(', ') || 'Remote source read error'}.`,
+        expected: condition.expectedValue,
+        observed: undefined,
+        supportingEvidenceId: failedObservation.evidenceId,
+      };
+    }
+
     // 2. Check for stale evidence relative to action invocation
     if (action) {
       const actionTime = new Date(action.invokedAt).getTime();
