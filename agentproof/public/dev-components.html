@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AgentProof — Editorial Component Showcase (/dev/components)</title>
+  <link rel="stylesheet" href="/styles/theme.css">
+  <style>
+    .showcase-container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: var(--space-12) var(--space-6);
+    }
+    .showcase-header {
+      margin-bottom: var(--space-10);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-hairline);
+      padding-bottom: var(--space-6);
+    }
+    .component-group {
+      margin-bottom: var(--space-10);
+      padding-bottom: var(--space-10);
+      border-bottom: 1px solid var(--border-hairline);
+    }
+    .component-group:last-child {
+      border-bottom: none;
+    }
+    .group-title {
+      font-family: var(--font-serif);
+      font-size: var(--text-xl);
+      margin-bottom: var(--space-2);
+      color: var(--text-primary);
+    }
+    .group-desc {
+      font-size: var(--text-sm);
+      color: var(--text-secondary);
+      margin-bottom: var(--space-6);
+      max-width: 68ch;
+    }
+    .states-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      flex-wrap: wrap;
+      margin-bottom: var(--space-4);
+    }
+    .state-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      width: 100px;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="showcase-container">
+    <header class="showcase-header">
+      <div>
+        <p class="section-label">System Specification</p>
+        <h1 style="font-family: var(--font-serif); font-size: var(--text-2xl);">Editorial Precision — Component Kit</h1>
+        <p class="prose-block" style="color: var(--text-secondary); margin-top: var(--space-2);">
+          Rigorous, state-driven UI primitives engineered for cryptographic verification and postcondition auditing.
+        </p>
+      </div>
+      <div style="display: flex; gap: var(--space-3); align-items: center;">
+        <a href="/" class="btn btn-secondary btn-sm">Landing Page</a>
+        <a href="/app" class="btn btn-secondary btn-sm">Console App</a>
+        <button id="themeToggleBtn" class="btn btn-secondary btn-sm" onclick="toggleTheme()">
+          <span id="themeLabel">Light Mode</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- 1. BUTTONS SPECIFICATION -->
+    <section class="component-group">
+      <h2 class="group-title">1. Buttons Specification</h2>
+      <p class="group-desc">
+        Three strict heights: 32px (sm), 36px (md), 40px (lg). 4px radius, medium weight (14px). Tone shifts over 120ms with zero blur or lift-and-glow.
+      </p>
+
+      <div class="states-row">
+        <span class="state-label">Variants (md)</span>
+        <button class="btn btn-primary btn-md">Primary Action</button>
+        <button class="btn btn-secondary btn-md">Secondary Outlined</button>
+        <button class="btn btn-ghost btn-md">Ghost Action</button>
+        <button class="btn btn-destructive btn-md">Destructive Action</button>
+        <button class="btn btn-secondary btn-md">
+          Command Palette <span class="kbd-hint">⌘K</span>
+        </button>
+      </div>
+
+      <div class="states-row">
+        <span class="state-label">Sizes</span>
+        <button class="btn btn-primary btn-sm">Small (32px)</button>
+        <button class="btn btn-primary btn-md">Medium (36px)</button>
+        <button class="btn btn-primary btn-lg">Large (40px)</button>
+      </div>
+
+      <div class="states-row">
+        <span class="state-label">States</span>
+        <button class="btn btn-primary btn-md" disabled>Disabled State</button>
+        <button class="btn btn-secondary btn-md" disabled>Disabled Outlined</button>
+        <button class="btn btn-primary btn-md btn-loading">Loading</button>
+        <button class="btn btn-secondary btn-md" id="flashBtn" onclick="triggerSuccessFlash(this)">
+          Click for Success Flash
+        </button>
+      </div>
+    </section>
+
+    <!-- 2. VERDICT BADGES (WCAG AA & SVG Silhouettes) -->
+    <section class="component-group">
+      <h2 class="group-title">2. Authoritative Verdict Badges</h2>
+      <p class="group-desc">
+        Three verdicts only. Reserved exclusively for backend evaluations. High-contrast WCAG AA colors paired with distinct geometric SVG silhouette glyphs.
+      </p>
+
+      <div class="states-row">
+        <span class="state-label">Large (28px)</span>
+        <span class="verdict-badge badge-pass badge-lg">
+          <svg class="verdict-glyph" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 8.5l2 2 4-4"/></svg>
+          PASS
+        </span>
+        <span class="verdict-badge badge-fail badge-lg">
+          <svg class="verdict-glyph" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5.5 5.5l5 5M10.5 5.5l-5 5"/></svg>
+          FAIL
+        </span>
+        <span class="verdict-badge badge-inconclusive badge-lg">
+          <svg class="verdict-glyph" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" stroke-dasharray="3 2"/><path d="M8 5.5a1.5 1.5 0 0 1 1.5 1.5c0 1-1.5 1.5-1.5 2.5m0 2h.01"/></svg>
+          INCONCLUSIVE
+        </span>
+      </div>
+
+      <div class="states-row">
+        <span class="state-label">Medium (24px)</span>
+        <span class="verdict-badge badge-pass">
+          <svg class="verdict-glyph" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 8.5l2 2 4-4"/></svg>
+          PASS
+        </span>
+        <span class="verdict-badge badge-fail">
+          <svg class="verdict-glyph" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5.5 5.5l5 5M10.5 5.5l-5 5"/></svg>
+          FAIL
+        </span>
+        <span class="verdict-badge badge-inconclusive">
+          <svg class="verdict-glyph" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" stroke-dasharray="3 2"/><path d="M8 5.5a1.5 1.5 0 0 1 1.5 1.5c0 1-1.5 1.5-1.5 2.5m0 2h.01"/></svg>
+          INCONCLUSIVE
+        </span>
+        <span class="badge-simulation">[SIMULATION]</span>
+      </div>
+
+      <div class="states-row">
+        <span class="state-label">Small (20px)</span>
+        <span class="verdict-badge badge-pass badge-sm">PASS</span>
+        <span class="verdict-badge badge-fail badge-sm">FAIL</span>
+        <span class="verdict-badge badge-inconclusive badge-sm">INCONCLUSIVE</span>
+      </div>
+    </section>
+
+    <!-- 3. OBSERVATION STATUS CHIPS (Evidence Probes Only) -->
+    <section class="component-group">
+      <h2 class="group-title">3. Observation Status Chips</h2>
+      <p class="group-desc">
+        Evidence states are NOT verdicts. Rendered as an unfilled outline with a colored solid dot so engineers never confuse evidence retrieval with authoritative verdicts.
+      </p>
+
+      <div class="states-row">
+        <span class="state-label">States</span>
+        <span class="obs-chip obs-found">
+          <span class="obs-dot"></span>
+          FOUND
+        </span>
+        <span class="obs-chip obs-not-found">
+          <span class="obs-dot"></span>
+          NOT_FOUND
+        </span>
+        <span class="obs-chip obs-read-error">
+          <span class="obs-dot"></span>
+          READ_ERROR
+        </span>
+        <span class="obs-chip obs-untrusted">
+          <span class="obs-dot"></span>
+          UNTRUSTED
+        </span>
+      </div>
+    </section>
+
+    <!-- 4. POSTCONDITION ROWS & INLINE DIFF -->
+    <section class="component-group">
+      <h2 class="group-title">4. Postcondition Row & Inline Diff</h2>
+      <p class="group-desc">
+        Exposes expected vs observed state side-by-side with semantic diff highlighting and independent evidence freshness metadata.
+      </p>
+
+      <!-- Success Row -->
+      <div class="postcondition-row">
+        <div class="postcondition-header">
+          <div>
+            <span class="verdict-badge badge-pass badge-sm">PASS</span>
+            <span class="postcondition-expr" style="margin-left: var(--space-2);">subscription.status EQUALS "CANCELLED"</span>
+          </div>
+          <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">observed 14s ago · DIRECT_READ</span>
+        </div>
+        <div class="diff-grid">
+          <div class="diff-box">
+            <div class="diff-box-label">Expected Value</div>
+            <div class="diff-match">"CANCELLED"</div>
+          </div>
+          <div class="diff-box">
+            <div class="diff-box-label">Observed Ground Truth</div>
+            <div class="diff-match">"CANCELLED"</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Failure Row -->
+      <div class="postcondition-row">
+        <div class="postcondition-header">
+          <div>
+            <span class="verdict-badge badge-fail badge-sm">FAIL</span>
+            <span class="postcondition-expr" style="margin-left: var(--space-2);">billing.plan_tier EQUALS "FREE_TIER"</span>
+          </div>
+          <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">observed 2s ago · DIRECT_READ</span>
+        </div>
+        <div class="diff-grid">
+          <div class="diff-box">
+            <div class="diff-box-label">Expected Value</div>
+            <div>"FREE_TIER"</div>
+          </div>
+          <div class="diff-box">
+            <div class="diff-box-label">Observed Ground Truth</div>
+            <div class="diff-mismatch">"ENTERPRISE_ACTIVE"</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. EDITORIAL TABLE & MONOSPACE COPYABLE IDS -->
+    <section class="component-group">
+      <h2 class="group-title">5. Precision Table & Monospace Copy-on-Click</h2>
+      <p class="group-desc">
+        Sticky headers, 36px dense rows, inline "Copied" feedback without disruptive toasts, and keyboard row focus.
+      </p>
+
+      <div class="table-container">
+        <table class="table-editorial">
+          <thead>
+            <tr>
+              <th>Trace ID</th>
+              <th>Operation</th>
+              <th>Authoritative Verdict</th>
+              <th>Latency</th>
+              <th>Observed At</th>
+              <th style="text-align: right;">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <span class="copy-id" onclick="copyId(this, 'tr-8f4b1a-992e')">
+                  tr-8f4b1a-992e
+                </span>
+              </td>
+              <td>cancel_subscription</td>
+              <td><span class="verdict-badge badge-pass badge-sm">PASS</span></td>
+              <td style="font-family: var(--font-mono);">4.2 ms</td>
+              <td style="font-family: var(--font-mono); color: var(--text-muted);">2026-10-17 15:42:10</td>
+              <td style="text-align: right;"><button class="btn btn-ghost btn-sm">Inspect →</button></td>
+            </tr>
+            <tr>
+              <td>
+                <span class="copy-id" onclick="copyId(this, 'tr-3c990d-114a')">
+                  tr-3c990d-114a
+                </span>
+              </td>
+              <td>downgrade_and_cancel</td>
+              <td><span class="verdict-badge badge-fail badge-sm">FAIL</span></td>
+              <td style="font-family: var(--font-mono);">6.1 ms</td>
+              <td style="font-family: var(--font-mono); color: var(--text-muted);">2026-10-17 15:41:55</td>
+              <td style="text-align: right;"><button class="btn btn-ghost btn-sm">Inspect →</button></td>
+            </tr>
+            <tr>
+              <td>
+                <span class="copy-id" onclick="copyId(this, 'tr-1e44a7-882f')">
+                  tr-1e44a7-882f
+                </span>
+              </td>
+              <td>provision_tenant_replica</td>
+              <td><span class="verdict-badge badge-inconclusive badge-sm">INCONCLUSIVE</span></td>
+              <td style="font-family: var(--font-mono);">8.9 ms</td>
+              <td style="font-family: var(--font-mono); color: var(--text-muted);">2026-10-17 15:40:12</td>
+              <td style="text-align: right;"><button class="btn btn-ghost btn-sm">Inspect →</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 6. EMPTY & UNAVAILABLE STATES -->
+    <section class="component-group">
+      <h2 class="group-title">6. Empty & Unavailable States</h2>
+      <p class="group-desc">
+        Custom hairline SVG line illustration, single-sentence explanation, and exactly one primary recovery action.
+      </p>
+
+      <div class="editorial-panel">
+        <div class="empty-state">
+          <svg class="empty-icon" viewBox="0 0 24 24">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <path d="M9 9h6M9 13h6M9 17h4"/>
+            <circle cx="18" cy="18" r="3"/>
+          </svg>
+          <div class="empty-title">No matching verifications found</div>
+          <div class="empty-description">
+            Your filter parameters yielded zero traces. Try clearing your search query or running a new scenario.
+          </div>
+          <button class="btn btn-secondary btn-sm" style="margin-top: var(--space-2);">
+            Reset Filters
+          </button>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme') || 'dark';
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      document.getElementById('themeLabel').textContent = next === 'dark' ? 'Light Mode' : 'Dark Mode';
+    }
+
+    function copyId(el, id) {
+      navigator.clipboard.writeText(id).then(() => {
+        const originalText = el.textContent;
+        el.textContent = 'Copied!';
+        el.style.color = 'var(--verdict-pass)';
+        setTimeout(() => {
+          el.textContent = id;
+          el.style.color = '';
+        }, 1200);
+      });
+    }
+
+    function triggerSuccessFlash(btn) {
+      const original = btn.textContent;
+      btn.textContent = '✓ Saved';
+      btn.style.borderColor = 'var(--verdict-pass)';
+      btn.style.color = 'var(--verdict-pass)';
+      setTimeout(() => {
+        btn.textContent = original;
+        btn.style.borderColor = '';
+        btn.style.color = '';
+      }, 900);
+    }
+  </script>
+</body>
+</html>
