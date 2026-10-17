@@ -1,0 +1,6 @@
+# Local shims
+powershell.cmd
+
+# Operating system files
+.DS_Store
+Thumbs.db
