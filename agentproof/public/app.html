@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AgentProof — Independent Verification Console</title>
+  <meta name="description" content="Production Web Console for AgentProof independent AI postcondition verification layer">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles/theme.css?v=editorial">
+</head>
+<body>
+  <div id="app">
+    <!-- Persistent Sidebar Navigation -->
+    <aside class="app-sidebar" id="sidebar">
+      <div class="sidebar-header">
+        <a href="#overview" class="brand-logo" id="logo-link">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <path d="M7 12h10M12 7v10"/>
+          </svg>
+          <span class="brand-title" style="font-family: var(--font-serif); font-size: 18px; font-weight: 500;">AgentProof</span>
+        </a>
+        <button class="sidebar-collapse-btn" id="sidebar-toggle" title="Toggle Sidebar (Ctrl+B)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </button>
+      </div>
+
+      <nav class="sidebar-nav" id="sidebar-nav">
+        <a href="#overview" class="nav-item active" data-view="overview" id="nav-overview">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="7" height="7"></rect>
+            <rect x="14" y="3" width="7" height="7"></rect>
+            <rect x="14" y="14" width="7" height="7"></rect>
+            <rect x="3" y="14" width="7" height="7"></rect>
+          </svg>
+          <span class="nav-text">Overview</span>
+        </a>
+
+        <a href="#verifications" class="nav-item" data-view="verifications" id="nav-verifications">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+          </svg>
+          <span class="nav-text">Verifications</span>
+          <span class="nav-badge" id="nav-verifications-count">0</span>
+        </a>
+
+        <a href="#evidence-audit" class="nav-item" data-view="evidence-audit" id="nav-evidence">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+          </svg>
+          <span class="nav-text">Evidence & Audit</span>
+        </a>
+
+        <a href="#integrations-webhooks" class="nav-item" data-view="integrations-webhooks" id="nav-integrations">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"></path>
+          </svg>
+          <span class="nav-text">Integrations</span>
+        </a>
+
+        <a href="#scenarios" class="nav-item" data-view="scenarios" id="nav-scenarios">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="5 3 19 12 5 21 5 3"></polygon>
+          </svg>
+          <span class="nav-text">Scenarios</span>
+        </a>
+
+        <a href="#help" class="nav-item" data-view="help" id="nav-help">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+          <span class="nav-text">Help & Docs</span>
+        </a>
+      </nav>
+
+      <div class="sidebar-footer">
+        <div class="tenant-pill" id="tenant-indicator" title="Current tenant scope">
+          <div class="tenant-dot"></div>
+          <span class="tenant-text" id="tenant-name">tenant: default-tenant</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Container -->
+    <div class="app-main">
+      <!-- Topbar Header -->
+      <header class="app-topbar">
+        <div class="breadcrumbs" id="breadcrumbs">
+          <span>AgentProof</span>
+          <span>/</span>
+          <span class="current" id="current-view-title">Overview</span>
+        </div>
+
+        <div class="topbar-actions">
+          <button class="search-command-btn" id="command-palette-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <span>Quick search...</span>
+            <span class="kbd-shortcut">Ctrl+K</span>
+          </button>
+
+          <button class="btn-icon" id="theme-toggle-btn" title="Toggle Dark / Light mode">
+            <svg id="theme-icon-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="display: none;">
+              <circle cx="12" cy="12" r="5"></circle>
+              <line x1="12" y1="1" x2="12" y2="3"></line>
+              <line x1="12" y1="21" x2="12" y2="23"></line>
+              <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+              <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
+              <line x1="1" y1="12" x2="3" y2="12"></line>
+              <line x1="21" y1="12" x2="23" y2="12"></line>
+              <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+              <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+            </svg>
+            <svg id="theme-icon-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
+            </svg>
+          </button>
+
+          <div class="health-status-badge" id="system-health-pill">
+            <div style="width: 6px; height: 6px; border-radius: 50%; background-color: currentColor;"></div>
+            <span id="system-health-text">System Healthy</span>
+          </div>
+        </div>
+      </header>
+
+      <!-- Dynamic Content View Outlet -->
+      <main id="content-outlet">
+        <!-- Rendered by app.js router -->
+      </main>
+    </div>
+  </div>
+
+  <!-- Verification Detail Drawer -->
+  <div class="drawer-backdrop" id="drawer-backdrop"></div>
+  <aside class="detail-drawer" id="detail-drawer" aria-hidden="true">
+    <div class="drawer-header">
+      <div>
+        <h3 id="drawer-title" style="font-size: 1.1rem; font-weight: 700;">Verification Run</h3>
+        <p id="drawer-subtitle" style="font-size: 12px; color: var(--text-muted); font-family: var(--font-mono);"></p>
+      </div>
+      <button class="btn-icon" id="drawer-close-btn" title="Close Drawer (Esc)">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <line x1="18" y1="6" x2="6" y2="18"></line>
+          <line x1="6" y1="6" x2="18" y2="18"></line>
+        </svg>
+      </button>
+    </div>
+    <div class="drawer-body" id="drawer-body">
+      <!-- Injected by router -->
+    </div>
+  </aside>
+
+  <!-- Run Verification Modal -->
+  <div class="modal-backdrop" id="run-verification-modal">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3 class="modal-title">Run Independent Verification</h3>
+        <button class="btn-icon" id="close-run-modal-btn">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 13px; color: var(--text-secondary);">
+          Submit an agent's claimed action and independent evidence. AgentProof's deterministic engine will evaluate all postconditions and produce an authoritative verdict.
+        </p>
+
+        <div class="form-group">
+          <label class="form-label">Target System</label>
+          <input type="text" class="form-input" id="rv-system" value="billing">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Resource ID</label>
+          <input type="text" class="form-input" id="rv-resource-id" value="sub-100">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Claimed Operation</label>
+          <input type="text" class="form-input" id="rv-operation" value="cancel_subscription">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Required Postcondition Path</label>
+          <input type="text" class="form-input" id="rv-path" value="status">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Expected Value</label>
+          <input type="text" class="form-input" id="rv-expected" value="CANCELLED">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Observed Value from Independent Evidence</label>
+          <input type="text" class="form-input" id="rv-observed" value="CANCELLED">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" id="cancel-run-modal-btn">Cancel</button>
+        <button class="btn btn-primary" id="submit-run-modal-btn">Execute Verification</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Command Palette Modal -->
+  <div class="modal-backdrop" id="command-palette-modal">
+    <div class="modal-dialog" style="width: 500px;">
+      <div style="padding: 1rem; border-bottom: 1px solid var(--border-subtle); display: flex; align-items: center; gap: 0.5rem;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--text-muted);">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" id="command-input" placeholder="Jump to page, scenario, or action..." style="flex: 1; border: none; background: transparent; color: var(--text-primary); font-size: 14px; outline: none;">
+      </div>
+      <div style="padding: 0.5rem; max-height: 300px; overflow-y: auto;" id="command-results">
+        <!-- Rendered by app.js -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Keyboard Shortcuts Cheat Sheet Modal (?) -->
+  <div class="modal-backdrop" id="shortcuts-modal">
+    <div class="modal-dialog" style="width: 540px;">
+      <div class="modal-header">
+        <h3 class="modal-title">Keyboard Shortcuts</h3>
+        <button class="btn-icon" id="close-shortcuts-btn" title="Close (Esc)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="modal-body" style="padding: 1rem 1.5rem;">
+        <table class="shortcuts-table">
+          <tbody>
+            <tr>
+              <td><span class="kbd-badge">Ctrl</span> + <span class="kbd-badge">K</span> / <span class="kbd-badge">⌘</span> + <span class="kbd-badge">K</span></td>
+              <td style="color: var(--text-primary); font-weight: 500;">Open Command Palette</td>
+            </tr>
+            <tr>
+              <td><span class="kbd-badge">Ctrl</span> + <span class="kbd-badge">B</span> / <span class="kbd-badge">⌘</span> + <span class="kbd-badge">B</span></td>
+              <td style="color: var(--text-primary); font-weight: 500;">Toggle Sidebar collapse</td>
+            </tr>
+            <tr>
+              <td><span class="kbd-badge">?</span> / <span class="kbd-badge">Shift</span> + <span class="kbd-badge">/</span></td>
+              <td style="color: var(--text-primary); font-weight: 500;">Show this Keyboard Shortcuts cheat sheet</td>
+            </tr>
+            <tr>
+              <td><span class="kbd-badge">Esc</span></td>
+              <td style="color: var(--text-primary); font-weight: 500;">Close active modal, drawer, or search</td>
+            </tr>
+            <tr>
+              <td><span class="kbd-badge">1</span> – <span class="kbd-badge">6</span></td>
+              <td style="color: var(--text-primary); font-weight: 500;">Jump to view (1: Overview, 2: Verifications, 3: Evidence, 4: Integrations, 5: Scenarios, 6: Help)</td>
+            </tr>
+            <tr>
+              <td><span class="kbd-badge">T</span></td>
+              <td style="color: var(--text-primary); font-weight: 500;">Toggle Dark / Light theme</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary btn-sm" id="dismiss-shortcuts-btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Interactive 4-Step Educational Onboarding Modal -->
+  <div class="modal-backdrop" id="onboarding-modal">
+    <div class="modal-dialog onboarding-dialog">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 0.75rem;">
+          <div class="onboarding-hero-num" id="onboarding-step-num">1</div>
+          <div>
+            <h3 class="modal-title" id="onboarding-title">Agent Claims Are Not Proof</h3>
+            <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);" id="onboarding-subtitle">Step 1 of 4 • Core Invariant</span>
+          </div>
+        </div>
+        <button class="btn-icon" id="close-onboarding-btn" title="Skip walkthrough (Esc)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="18" y1="6" x2="6" y2="18"></line>
+            <line x1="6" y1="6" x2="18" y2="18"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="modal-body" id="onboarding-body">
+        <!-- Injected dynamically by app.js based on current step -->
+      </div>
+
+      <div class="modal-footer" style="justify-content: space-between;">
+        <div class="onboarding-dots" id="onboarding-dots">
+          <div class="onboarding-dot active" data-step="1"></div>
+          <div class="onboarding-dot" data-step="2"></div>
+          <div class="onboarding-dot" data-step="3"></div>
+          <div class="onboarding-dot" data-step="4"></div>
+        </div>
+        <div style="display: flex; gap: 0.5rem;">
+          <button class="btn btn-secondary btn-sm" id="onboarding-prev-btn" style="display: none;">Previous</button>
+          <button class="btn btn-secondary btn-sm" id="onboarding-skip-btn">Skip Guide</button>
+          <button class="btn btn-primary btn-sm" id="onboarding-next-btn">Next Step →</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container"></div>
+
+  <!-- Three.js (Selective 3D Pipeline Visualization, with graceful 2D fallback) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <!-- Main SPA Client App -->
+  <script src="/js/app.js?v=editorial"></script>
+</body>
+</html>

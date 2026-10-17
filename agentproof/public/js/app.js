@@ -74,20 +74,31 @@
 
     const toast = document.createElement('div');
     toast.className = 'toast';
+    toast.style.display = 'flex';
+    toast.style.alignItems = 'center';
+    toast.style.gap = '8px';
+    toast.style.padding = '8px 14px';
+    toast.style.borderRadius = 'var(--radius-sm)';
+    toast.style.background = 'var(--bg-surface)';
+    toast.style.border = '1px solid var(--border-hairline)';
+    toast.style.color = 'var(--text-primary)';
+    toast.style.fontSize = 'var(--text-sm)';
+    toast.style.boxShadow = 'var(--shadow-popover)';
+    toast.style.marginBottom = '8px';
 
-    let icon = 'ℹ️';
-    if (type === 'success') icon = '✅';
-    if (type === 'error') icon = '❌';
+    let prefix = '<span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">[INFO]</span>';
+    if (type === 'success') prefix = '<span style="font-family: var(--font-mono); font-size: 11px; color: var(--verdict-pass);">[OK]</span>';
+    if (type === 'error') prefix = '<span style="font-family: var(--font-mono); font-size: 11px; color: var(--verdict-fail);">[FAIL]</span>';
 
-    toast.innerHTML = `<span>${icon}</span><span>${escapeHtml(message)}</span>`;
+    toast.innerHTML = `${prefix} <span>${escapeHtml(message)}</span>`;
     container.appendChild(toast);
 
     setTimeout(() => {
       toast.style.opacity = '0';
       toast.style.transform = 'translateY(10px)';
-      toast.style.transition = 'all 200ms ease';
-      setTimeout(() => toast.remove(), 200);
-    }, 3500);
+      toast.style.transition = 'all 160ms var(--ease-standard)';
+      setTimeout(() => toast.remove(), 160);
+    }, 3200);
   }
 
   function escapeHtml(str) {
@@ -174,37 +185,47 @@
     else renderOverview(outlet);
   }
 
-  // --- Helper: Verdict Badge HTML ---
-  function getVerdictBadgeHtml(verdict) {
+  // --- Helper: Verdict Badge HTML (SVG Silhouettes, Muted AA Contrast) ---
+  function getVerdictBadgeHtml(verdict, size = '') {
     const v = String(verdict || 'UNKNOWN').toUpperCase();
+    const sizeCls = size ? ` badge-${size}` : '';
     if (v === 'PASS') {
-      return `<span class="verdict-badge pass">✓ PASS</span>`;
+      return `<span class="verdict-badge badge-pass${sizeCls}">
+        <svg class="verdict-glyph" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 8.5l2 2 4-4"/></svg>
+        PASS
+      </span>`;
     }
     if (v === 'FAIL') {
-      return `<span class="verdict-badge fail">✕ FAIL</span>`;
+      return `<span class="verdict-badge badge-fail${sizeCls}">
+        <svg class="verdict-glyph" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5.5 5.5l5 5M10.5 5.5l-5 5"/></svg>
+        FAIL
+      </span>`;
     }
     if (v === 'INCONCLUSIVE') {
-      return `<span class="verdict-badge inconclusive">⚠ INCONCLUSIVE</span>`;
+      return `<span class="verdict-badge badge-inconclusive${sizeCls}">
+        <svg class="verdict-glyph" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" stroke-dasharray="3 2"/><path d="M8 5.5a1.5 1.5 0 0 1 1.5 1.5c0 1-1.5 1.5-1.5 2.5m0 2h.01"/></svg>
+        INCONCLUSIVE
+      </span>`;
     }
-    return `<span class="verdict-badge" style="background: var(--border-subtle); color: var(--text-muted);">${escapeHtml(v)}</span>`;
+    return `<span class="verdict-badge${sizeCls}" style="border-color: var(--border-hairline); color: var(--text-muted);">${escapeHtml(v)}</span>`;
   }
 
-  // --- Helper: Observation Status Badge (Distinct from Verdicts) ---
+  // --- Helper: Observation Status Badge (Distinct from Verdicts: dot + outline, NO fill) ---
   function getObservationBadgeHtml(status) {
     const s = String(status || 'FOUND').toUpperCase();
     if (s === 'FOUND') {
-      return `<span class="obs-badge found">● FOUND</span>`;
+      return `<span class="obs-chip obs-found"><span class="obs-dot"></span>FOUND</span>`;
     }
     if (s === 'NOT_FOUND') {
-      return `<span class="obs-badge not-found">○ NOT_FOUND</span>`;
+      return `<span class="obs-chip obs-not-found"><span class="obs-dot"></span>NOT_FOUND</span>`;
     }
     if (s === 'READ_ERROR') {
-      return `<span class="obs-badge read-error">⚠ READ_ERROR</span>`;
+      return `<span class="obs-chip obs-read-error"><span class="obs-dot"></span>READ_ERROR</span>`;
     }
     if (s === 'UNTRUSTED') {
-      return `<span class="obs-badge untrusted">🛡 UNTRUSTED</span>`;
+      return `<span class="obs-chip obs-untrusted"><span class="obs-dot"></span>UNTRUSTED</span>`;
     }
-    return `<span class="obs-badge not-found">${escapeHtml(s)}</span>`;
+    return `<span class="obs-chip"><span class="obs-dot" style="background: var(--text-muted);"></span>${escapeHtml(s)}</span>`;
   }
 
   // --- Checklist State Management ---
@@ -522,29 +543,29 @@
 
       // Node 1: Action (Cube)
       const geo1 = new THREE.BoxGeometry(0.8, 0.8, 0.8);
-      const mat1 = new THREE.MeshStandardMaterial({ color: 0x06b6d4, roughness: 0.3, metalness: 0.6 });
+      const mat1 = new THREE.MeshStandardMaterial({ color: 0x5a5347, roughness: 0.4, metalness: 0.2 });
       const mesh1 = new THREE.Mesh(geo1, mat1);
       mesh1.position.set(-3.9, 0, 0);
       scene.add(mesh1);
 
       // Node 2: Postconditions (Octahedron)
       const geo2 = new THREE.OctahedronGeometry(0.6);
-      const mat2 = new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.3, metalness: 0.6 });
+      const mat2 = new THREE.MeshStandardMaterial({ color: 0x756e5f, roughness: 0.4, metalness: 0.2 });
       const mesh2 = new THREE.Mesh(geo2, mat2);
       mesh2.position.set(-1.3, 0, 0);
       scene.add(mesh2);
 
       // Node 3: Evidence (Dodecahedron)
       const geo3 = new THREE.DodecahedronGeometry(0.55);
-      const mat3 = new THREE.MeshStandardMaterial({ color: 0xa855f7, roughness: 0.3, metalness: 0.6 });
+      const mat3 = new THREE.MeshStandardMaterial({ color: 0xc85a32, roughness: 0.3, metalness: 0.3 });
       const mesh3 = new THREE.Mesh(geo3, mat3);
       mesh3.position.set(1.3, 0, 0);
       scene.add(mesh3);
 
       // Node 4: Verdict (Sphere)
-      const verdictColor = verdict === 'PASS' ? 0x10b981 : verdict === 'FAIL' ? 0xef4444 : 0xf59e0b;
+      const verdictColor = verdict === 'PASS' ? 0x2d6a4f : verdict === 'FAIL' ? 0xa43025 : 0xb57614;
       const geo4 = new THREE.SphereGeometry(0.65, 32, 32);
-      const mat4 = new THREE.MeshStandardMaterial({ color: verdictColor, roughness: 0.2, metalness: 0.8 });
+      const mat4 = new THREE.MeshStandardMaterial({ color: verdictColor, roughness: 0.2, metalness: 0.4 });
       const mesh4 = new THREE.Mesh(geo4, mat4);
       mesh4.position.set(3.9, 0, 0);
       scene.add(mesh4);
@@ -557,13 +578,13 @@
         new THREE.Vector3(3.9, 0, 0),
       ]);
       const tubeGeo = new THREE.TubeGeometry(curve, 64, 0.05, 8, false);
-      const tubeMat = new THREE.MeshBasicMaterial({ color: 0x334155, transparent: true, opacity: 0.6 });
+      const tubeMat = new THREE.MeshBasicMaterial({ color: 0x524d42, transparent: true, opacity: 0.5 });
       const tubeMesh = new THREE.Mesh(tubeGeo, tubeMat);
       scene.add(tubeMesh);
 
       // Photon Traveling Particle
       const photonGeo = new THREE.SphereGeometry(0.12, 16, 16);
-      const photonMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
+      const photonMat = new THREE.MeshBasicMaterial({ color: 0xc85a32 });
       const photonMesh = new THREE.Mesh(photonGeo, photonMat);
       scene.add(photonMesh);
 
@@ -881,51 +902,32 @@
         ${checklistHtml}
         ${onboardingHtml}
 
-        <!-- KPI Metrics Grid -->
-        <div class="kpi-grid">
-          <div class="kpi-card">
-            <div class="kpi-header">
-              <span class="kpi-title">Total Verifications</span>
-              <span style="font-size: 16px;">🔍</span>
-            </div>
-            <div class="kpi-value">${data.metrics.totalVerifications}</div>
-            <div class="kpi-meta">Scoped to ${escapeHtml(data.tenantId)}</div>
+        <!-- Metric Display Numerals (Newsreader Serif, Ruled Layout) -->
+        <div style="border-top: 1px solid var(--border-hairline); border-bottom: 1px solid var(--border-hairline); padding: var(--space-6) 0; margin: var(--space-6) 0; display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: var(--space-6);">
+          <div>
+            <div class="section-label">Total Executions</div>
+            <div class="metric-numeral">${data.metrics.totalVerifications}</div>
+            <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">Scoped to ${escapeHtml(data.tenantId)}</div>
           </div>
-
-          <div class="kpi-card pass">
-            <div class="kpi-header">
-              <span class="kpi-title">PASS Verdicts</span>
-              <span class="verdict-badge pass">Verified</span>
-            </div>
-            <div class="kpi-value">${data.metrics.passCount}</div>
-            <div class="kpi-meta">${data.metrics.passRate}% pass rate</div>
+          <div>
+            <div class="section-label" style="color: var(--verdict-pass);">PASS Proven</div>
+            <div class="metric-numeral" style="color: var(--verdict-pass);">${data.metrics.passCount}</div>
+            <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">${data.metrics.passRate}% pass rate</div>
           </div>
-
-          <div class="kpi-card fail">
-            <div class="kpi-header">
-              <span class="kpi-title">FAIL Violations</span>
-              <span class="verdict-badge fail">Violated</span>
-            </div>
-            <div class="kpi-value">${data.metrics.failCount}</div>
-            <div class="kpi-meta">Independent evidence proved failure</div>
+          <div>
+            <div class="section-label" style="color: var(--verdict-fail);">FAIL Violations</div>
+            <div class="metric-numeral" style="color: var(--verdict-fail);">${data.metrics.failCount}</div>
+            <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">Ground truth contradicted</div>
           </div>
-
-          <div class="kpi-card inconclusive">
-            <div class="kpi-header">
-              <span class="kpi-title">INCONCLUSIVE</span>
-              <span class="verdict-badge inconclusive">Unresolved</span>
-            </div>
-            <div class="kpi-value">${data.metrics.inconclusiveCount}</div>
-            <div class="kpi-meta">Missing, stale, or conflicting evidence</div>
+          <div>
+            <div class="section-label" style="color: var(--verdict-inconclusive);">Inconclusive</div>
+            <div class="metric-numeral" style="color: var(--verdict-inconclusive);">${data.metrics.inconclusiveCount}</div>
+            <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">Evidence insufficient/stale</div>
           </div>
-
-          <div class="kpi-card">
-            <div class="kpi-header">
-              <span class="kpi-title">Evidence Completeness</span>
-              <span style="font-size: 16px;">📊</span>
-            </div>
-            <div class="kpi-value">${data.metrics.evidenceCompletenessRate}%</div>
-            <div class="kpi-meta">Observed vs required conditions</div>
+          <div>
+            <div class="section-label">Completeness</div>
+            <div class="metric-numeral">${data.metrics.evidenceCompletenessRate}%</div>
+            <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">Observed vs required</div>
           </div>
         </div>
 
@@ -933,49 +935,50 @@
         ${attentionHtml}
 
         <!-- Verdict Distribution & Health Split -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
-          <!-- Verdict Chart -->
-          <div class="card">
-            <div class="card-header">
-              <h3 class="card-title">Authoritative Verdict Distribution</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); margin-bottom: var(--space-6);">
+          <!-- Verdict Chart Panel -->
+          <div class="editorial-panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); border-bottom: 1px solid var(--border-hairline); padding-bottom: var(--space-3);">
+              <h3 style="font-family: var(--font-serif); font-size: var(--text-md); font-weight: 500;">Authoritative Verdict Distribution</h3>
               <a href="#verifications" class="btn btn-secondary btn-sm">Explore All →</a>
             </div>
-            <div class="card-body" style="display: flex; align-items: center; justify-content: space-around; flex-wrap: wrap; gap: 1.5rem;">
+            <div style="display: flex; align-items: center; justify-content: space-around; flex-wrap: wrap; gap: var(--space-4);">
               ${chartSvg}
-              <div style="display: flex; flex-direction: column; gap: 0.75rem;">
-                <div style="display: flex; align-items: center; gap: 0.75rem;">
-                  <div style="width: 12px; height: 12px; border-radius: 3px; background-color: var(--verdict-pass);"></div>
+              <div style="display: flex; flex-direction: column; gap: var(--space-2); font-family: var(--font-mono); font-size: 12px;">
+                <div style="display: flex; align-items: center; gap: var(--space-2);">
+                  <div style="width: 10px; height: 10px; border-radius: 2px; background-color: var(--verdict-pass);"></div>
                   <span style="font-weight: 600; color: var(--text-primary);">${pass} PASS</span>
-                  <span style="font-size: 12px; color: var(--text-muted);">(${total > 0 ? Math.round((pass/total)*100) : 0}%)</span>
+                  <span style="color: var(--text-muted);">(${total > 0 ? Math.round((pass/total)*100) : 0}%)</span>
                 </div>
-                <div style="display: flex; align-items: center; gap: 0.75rem;">
-                  <div style="width: 12px; height: 12px; border-radius: 3px; background-color: var(--verdict-fail);"></div>
+                <div style="display: flex; align-items: center; gap: var(--space-2);">
+                  <div style="width: 10px; height: 10px; border-radius: 2px; background-color: var(--verdict-fail);"></div>
                   <span style="font-weight: 600; color: var(--text-primary);">${fail} FAIL</span>
-                  <span style="font-size: 12px; color: var(--text-muted);">(${total > 0 ? Math.round((fail/total)*100) : 0}%)</span>
+                  <span style="color: var(--text-muted);">(${total > 0 ? Math.round((fail/total)*100) : 0}%)</span>
                 </div>
-                <div style="display: flex; align-items: center; gap: 0.75rem;">
-                  <div style="width: 12px; height: 12px; border-radius: 3px; background-color: var(--verdict-inconclusive);"></div>
+                <div style="display: flex; align-items: center; gap: var(--space-2);">
+                  <div style="width: 10px; height: 10px; border-radius: 2px; background-color: var(--verdict-inconclusive);"></div>
                   <span style="font-weight: 600; color: var(--text-primary);">${inc} INCONCLUSIVE</span>
-                  <span style="font-size: 12px; color: var(--text-muted);">(${total > 0 ? Math.round((inc/total)*100) : 0}%)</span>
+                  <span style="color: var(--text-muted);">(${total > 0 ? Math.round((inc/total)*100) : 0}%)</span>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- Subsystem Health -->
-          <div class="card">
-            <div class="card-header">
-              <h3 class="card-title">Subsystem & Reader Connectivity</h3>
-              <span class="health-status-badge">All Operational</span>
+          <!-- Subsystem Health Panel -->
+          <div class="editorial-panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); border-bottom: 1px solid var(--border-hairline); padding-bottom: var(--space-3);">
+              <h3 style="font-family: var(--font-serif); font-size: var(--text-md); font-weight: 500;">Subsystem & Reader Connectivity</h3>
+              <span class="obs-chip obs-found"><span class="obs-dot"></span>OPERATIONAL</span>
             </div>
-            <div class="card-body" style="display: flex; flex-direction: column; gap: 0.75rem;">
+            <div style="display: flex; flex-direction: column; gap: var(--space-2);">
               ${healthItems.map((h) => `
-                <div style="display: flex; align-items: center; justify-content: space-between; padding: 0.75rem; background: var(--bg-surface); border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: var(--space-2) var(--space-3); background: var(--bg-surface-raised); border-radius: var(--radius-sm); border: 1px solid var(--border-hairline);">
                   <div>
-                    <div style="font-weight: 600; color: var(--text-primary);">${escapeHtml(h.name)}</div>
+                    <div style="font-weight: 500; font-size: var(--text-sm); color: var(--text-primary);">${escapeHtml(h.name)}</div>
                     <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">${escapeHtml(h.type)}</div>
                   </div>
-                  <span class="health-status-badge ${h.status !== 'HEALTHY' ? 'degraded' : ''}">
+                  <span class="obs-chip ${h.status === 'HEALTHY' ? 'obs-found' : 'obs-read-error'}">
+                    <span class="obs-dot"></span>
                     ${escapeHtml(h.status)}
                   </span>
                 </div>
@@ -985,18 +988,18 @@
         </div>
 
         <!-- Recent Verification Activity Table -->
-        <div class="card">
-          <div class="card-header">
+        <div class="editorial-panel" style="margin-top: var(--space-6);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4); border-bottom: 1px solid var(--border-hairline); padding-bottom: var(--space-3);">
             <div>
-              <h3 class="card-title">Recent Verification Activity</h3>
+              <h3 style="font-family: var(--font-serif); font-size: var(--text-md); font-weight: 500;">Recent Verification Activity</h3>
               <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
                 Chronological ledger of deterministic evaluations
               </p>
             </div>
             <a href="#verifications" class="btn btn-secondary btn-sm">View Full Explorer →</a>
           </div>
-          <div class="table-responsive">
-            <table class="data-table">
+          <div class="table-container">
+            <table class="table-editorial">
               <thead>
                 <tr>
                   <th>Trace ID</th>

@@ -70,6 +70,28 @@ Phase 8 introduces the **AgentProof Developer Security Console**, engineered wit
   - Contextual glossary explaining cryptographic and verification terms.
   - Dark (`Obsidian`) and Light (`Slate`) custom themes with zero flash on load.
 
+### Web Surfaces & Routes
+
+AgentProof provides three unified web surfaces sharing the **Editorial Precision** design system:
+
+- **Marketing Landing Page (`/`)**:
+  - Technical journal editorial presentation: *"An agent saying it worked is not proof it worked."*
+  - Interactive 3D WebGL / Three.js signature verification pipeline with real-time scenario switching (`PASS`, `FAIL`, `INCONCLUSIVE`).
+  - Scroll-driven diff: *"What the agent said vs What the database contains."*
+  - Ruled table layout of the Three Authoritative Verdicts and dominance rule (`FAIL > INCONCLUSIVE > PASS`).
+  - Interactive code blocks for MCP-native tools (`verify_outcome`, `inspect_trace`, etc.).
+  - Interactive cryptographic audit chain with real-time tamper-detection simulation.
+  - Transparent Trust Boundary (*What AgentProof establishes / What it does not claim*).
+- **Verification Console Platform (`/app`)**:
+  - Asymmetric ruled Overview dashboard with large Newsreader serif numerals.
+  - Verification Explorer with monospace IDs (click-to-copy), verdict badges with distinct SVG silhouettes, and inspection drawer with side-by-side postcondition diffs.
+  - Evidence & Cryptographic Audit Explorer with live SHA-256 hash-chain verification and RSA-SHA256 signed checkpoints.
+  - External state reader integration inventory (Postgres, S3, REST) with masked secret references.
+  - Scenario catalog (A–H) with one-click simulation execution.
+  - Command palette (`⌘K` / `Ctrl+K`), shortcuts cheat sheet (`?`), and zero-flash theme toggle.
+- **Component Showcase Laboratory (`/dev/components`)**:
+  - Live design system laboratory displaying all states (default, hover, active, focus-visible, disabled, loading, success-flash) across both Light Paper and Dark Warm Charcoal themes.
+
 ---
 
 ## Quickstart
@@ -93,17 +115,19 @@ npm install
 npm run build
 ```
 
-### Launching the Web Console
+### Launching the Web Server & Console
 
 ```bash
-# Start the Web Console HTTP Server (build + start)
+# Start the HTTP Server & Web Console (build + start)
 npm run start:console
 
 # Or run directly against existing dist:
 npm run console
 ```
 
-Open your browser at **`http://localhost:3000`**.
+- **Marketing Landing Page**: [http://localhost:3000/](http://localhost:3000/)
+- **Developer Console**: [http://localhost:3000/app](http://localhost:3000/app)
+- **Component Showcase**: [http://localhost:3000/dev/components](http://localhost:3000/dev/components)
 
 ---
 
