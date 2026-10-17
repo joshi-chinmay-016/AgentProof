@@ -19,6 +19,7 @@ export * from './verification/reason-codes.js';
 export * from './verification/condition-evaluator.js';
 export * from './verification/verdict-aggregator.js';
 export * from './verification/verification-engine.js';
+export * from './verification/evidence-trust-validator.js';
 
 // Domain Errors
 export * from './errors/domain-errors.js';

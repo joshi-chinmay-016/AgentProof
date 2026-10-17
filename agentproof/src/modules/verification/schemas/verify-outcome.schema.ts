@@ -69,6 +69,17 @@ export const EvidenceInputSchema = z.object({
   freshnessMs: z.number().int().nonnegative().default(0),
   integrityHash: z.string().optional(),
   limitations: z.array(z.string()).default([]),
+  digestAlgorithm: z.string().default('SHA-256').optional(),
+  canonicalizationVersion: z.string().default('v1').optional(),
+  schemaVersion: z.string().default('1.0.0').optional(),
+  provenance: z.object({
+    observerIdentity: z.string().optional(),
+    observerType: z.enum(['SIMULATED', 'DIRECT', 'AGENT', 'ATTESTED', 'EXTERNAL']).optional(),
+    attestationSignature: z.string().optional(),
+    attestationKeyId: z.string().optional(),
+    trustLevel: z.enum(['UNVERIFIED', 'INTEGRITY_CHECKED', 'SOURCE_AUTHENTICATED', 'ATTESTED']).optional(),
+  }).optional(),
+  observationStatus: z.enum(['FOUND', 'NOT_FOUND', 'ERROR']).optional(),
 });
 
 export const PolicyInputSchema = z.object({
@@ -85,10 +96,12 @@ export const VerifyOutcomeInputSchema = z.object({
   action: ActionInputSchema.optional().describe('Claimed action record from the agent'),
   postconditions: z
     .array(ConditionInputSchema)
-    .min(1, 'At least one postcondition is required for verification'),
-  preconditions: z.array(ConditionInputSchema).optional().default([]),
+    .min(1, 'At least one postcondition is required for verification')
+    .max(50, 'Cannot exceed 50 postconditions per verification request'),
+  preconditions: z.array(ConditionInputSchema).max(50).optional().default([]),
   evidence: z
     .array(EvidenceInputSchema)
+    .max(100, 'Cannot exceed 100 evidence items per verification request')
     .default([])
     .describe('Array of independently acquired evidence items'),
   policy: PolicyInputSchema.optional().default({

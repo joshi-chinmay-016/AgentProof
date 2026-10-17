@@ -8,6 +8,7 @@
 import { z } from 'zod';
 
 export type Verdict = 'PASS' | 'FAIL' | 'INCONCLUSIVE';
+export type VerificationVerdict = Verdict;
 
 export interface ConditionEvaluation {
   readonly conditionId: string;

@@ -37,6 +37,29 @@ export class ConditionEvaluator {
       };
     }
 
+    // Check for untrusted or integrity-compromised evidence
+    const untrustedEvidence = matchingEvidence.find((e) =>
+      e.limitations && (
+        e.limitations.includes('INTEGRITY_DIGEST_MISMATCH') ||
+        e.limitations.includes('UNTRUSTED_EVIDENCE') ||
+        e.limitations.includes('INVALID_OBSERVED_TIMESTAMP') ||
+        e.limitations.includes('FUTURE_TIMESTAMP_EXCEEDS_CLOCK_SKEW')
+      )
+    );
+
+    if (untrustedEvidence) {
+      return {
+        conditionId: condition.id,
+        description: condition.description,
+        verdict: 'INCONCLUSIVE',
+        reasonCode: ReasonCodes.INC_UNTRUSTED_EVIDENCE,
+        explanation: `Evidence [${untrustedEvidence.evidenceId}] is untrusted or failed integrity verification: ${untrustedEvidence.limitations.join(', ')}.`,
+        expected: condition.expectedValue,
+        observed: undefined,
+        supportingEvidenceId: untrustedEvidence.evidenceId,
+      };
+    }
+
     // 2. Check for stale evidence relative to action invocation
     if (action) {
       const actionTime = new Date(action.invokedAt).getTime();
