@@ -102,7 +102,15 @@ export class ConsoleServer {
    * Serves static frontend files with correct MIME types and SPA fallback.
    */
   private serveStatic(_req: http.IncomingMessage, res: http.ServerResponse, pathname: string): void {
-    let cleanPath = pathname === '/' ? '/index.html' : pathname;
+    let cleanPath = pathname;
+    if (pathname === '/') {
+      cleanPath = fs.existsSync(path.join(this.staticDir, 'landing.html')) ? '/landing.html' : '/index.html';
+    } else if (pathname === '/dev/components') {
+      cleanPath = '/dev-components.html';
+    } else if (pathname === '/app' || pathname === '/app/') {
+      cleanPath = fs.existsSync(path.join(this.staticDir, 'app.html')) ? '/app.html' : '/index.html';
+    }
+
     let filePath = path.join(this.staticDir, cleanPath);
 
     // Prevent directory traversal attacks
@@ -114,11 +122,11 @@ export class ConsoleServer {
 
     // Check if target file exists
     if (!fs.existsSync(filePath) || fs.statSync(filePath).isDirectory()) {
-      // SPA fallback to index.html for client-side routing
-      const indexPath = path.join(this.staticDir, 'index.html');
-      if (fs.existsSync(indexPath)) {
-        filePath = indexPath;
-      } else {
+      // Fallback for client-side SPA routes (e.g. /app, /verifications, /overview)
+      const appPath = path.join(this.staticDir, 'app.html');
+      filePath = fs.existsSync(appPath) ? appPath : path.join(this.staticDir, 'index.html');
+
+      if (!fs.existsSync(filePath)) {
         res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
         res.end(`<!DOCTYPE html><html><head><title>AgentProof Console</title></head><body><h1>AgentProof Web Console</h1><p>Static assets directory not yet populated: ${this.staticDir}</p></body></html>`);
         return;
@@ -133,7 +141,7 @@ export class ConsoleServer {
       res.writeHead(200, {
         'Content-Type': contentType,
         'Content-Length': content.length,
-        'Cache-Control': ext === '.html' ? 'no-cache' : 'public, max-age=3600',
+        'Cache-Control': (ext === '.html' || ext === '.css' || ext === '.js') ? 'no-cache, must-revalidate' : 'public, max-age=3600',
       });
       res.end(content);
     } catch (err: any) {

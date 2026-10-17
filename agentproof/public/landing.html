@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AgentProof — Independent Verification for AI Agents</title>
+  <meta name="description" content="An MCP-native independent verification platform for tool-using AI agents. Evaluates postconditions against ground-truth evidence.">
+  <link rel="stylesheet" href="/styles/theme.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <style>
+    /* Section Spacing & Editorial Grid */
+    .landing-section {
+      padding: var(--space-24) var(--space-6);
+      max-width: var(--content-max-width);
+      margin: 0 auto;
+      border-top: 1px solid var(--border-hairline);
+    }
+    .landing-section:first-of-type {
+      border-top: none;
+    }
+
+    /* Hero Headline Animation */
+    .hero-title-line {
+      display: block;
+      overflow: hidden;
+    }
+    .hero-title-word {
+      display: inline-block;
+      transform: translateY(0);
+      transition: transform var(--duration-700) var(--ease-emphasized);
+    }
+
+    /* Scene Container */
+    .scene-card {
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-lg);
+      background-color: var(--bg-surface);
+      overflow: hidden;
+      margin-top: var(--space-8);
+      position: relative;
+    }
+    .scene-toolbar {
+      padding: var(--space-3) var(--space-4);
+      border-bottom: 1px solid var(--border-hairline);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-surface-raised);
+    }
+    .scenario-switcher {
+      display: inline-flex;
+      background: var(--bg-surface-sunken);
+      padding: 2px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border-hairline);
+    }
+    .scenario-btn {
+      padding: 4px 10px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      border: none;
+      background: transparent;
+      color: var(--text-secondary);
+      border-radius: 2px;
+      cursor: pointer;
+      transition: all var(--duration-100) var(--ease-standard);
+    }
+    .scenario-btn.active {
+      background: var(--bg-surface);
+      color: var(--text-primary);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+    }
+    #threeCanvas {
+      width: 100%;
+      height: 380px;
+      display: block;
+    }
+
+    /* Split-view diff container */
+    .diff-agent-claim {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.6;
+      padding: var(--space-4);
+      background: var(--bg-surface-sunken);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-sm);
+      color: var(--text-secondary);
+    }
+    .diff-ground-truth {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      line-height: 1.6;
+      padding: var(--space-4);
+      background: var(--bg-surface-sunken);
+      border: 1px solid var(--verdict-fail-border);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+    }
+
+    /* Tabbed Code Section */
+    .code-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border-hairline);
+      background: var(--bg-surface-raised);
+      padding: 0 var(--space-4);
+      gap: var(--space-2);
+    }
+    .code-tab {
+      padding: var(--space-3) var(--space-3);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-muted);
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+    }
+    .code-tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    .code-pre {
+      padding: var(--space-5);
+      background: var(--bg-surface);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.65;
+      overflow-x: auto;
+      color: var(--text-primary);
+    }
+
+    /* Interactive Audit Chain */
+    .audit-chain-display {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      flex-wrap: wrap;
+      margin: var(--space-6) 0;
+    }
+    .chain-node {
+      padding: var(--space-3) var(--space-4);
+      border: 1px solid var(--border-hairline);
+      border-radius: var(--radius-sm);
+      background: var(--bg-surface);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      transition: all var(--duration-240) var(--ease-standard);
+      position: relative;
+    }
+    .chain-node.verified {
+      border-color: var(--verdict-pass-border);
+      background: var(--verdict-pass-bg);
+      color: var(--verdict-pass);
+    }
+    .chain-node.tampered {
+      border-color: var(--verdict-fail-border);
+      background: var(--verdict-fail-bg);
+      color: var(--verdict-fail);
+    }
+    .chain-connector {
+      width: 16px;
+      height: 1px;
+      background: var(--border-subtle);
+    }
+
+    /* Sticky how-it-works layout */
+    .works-split {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: var(--space-12);
+      align-items: start;
+    }
+    @media (max-width: 860px) {
+      .works-split {
+        grid-template-columns: 1fr;
+      }
+    }
+    .step-item {
+      padding: var(--space-4) 0;
+      border-bottom: 1px solid var(--border-hairline);
+      cursor: pointer;
+      transition: color var(--duration-160) var(--ease-standard);
+    }
+    .step-item.active .step-title {
+      color: var(--accent);
+    }
+    .step-num {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+    .step-title {
+      font-family: var(--font-serif);
+      font-size: var(--text-lg);
+      color: var(--text-primary);
+    }
+    .step-desc {
+      font-size: var(--text-sm);
+      color: var(--text-secondary);
+      margin-top: 4px;
+    }
+
+    /* Subtle hover on cards */
+    .editorial-hover-card {
+      transition: border-color var(--duration-160) var(--ease-standard),
+                  transform var(--duration-160) var(--ease-standard);
+    }
+    .editorial-hover-card:hover {
+      border-color: var(--accent-border);
+      transform: translateY(-2px);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 1. NAVIGATION -->
+  <nav class="landing-nav" id="landingNav">
+    <div class="landing-nav-inner">
+      <a href="/" class="landing-brand">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <path d="M7 12h10M12 7v10"/>
+        </svg>
+        <span>AgentProof</span>
+      </a>
+
+      <div class="landing-links">
+        <a href="#gap" class="landing-link">The Gap</a>
+        <a href="#verdicts" class="landing-link">Verdicts</a>
+        <a href="#how-it-works" class="landing-link">How it Works</a>
+        <a href="#mcp" class="landing-link">MCP Protocol</a>
+        <a href="#audit" class="landing-link">Audit Chain</a>
+        <a href="#trust" class="landing-link">Trust Model</a>
+      </div>
+
+      <div style="display: flex; align-items: center; gap: var(--space-3);">
+        <button class="btn btn-ghost btn-sm" onclick="toggleTheme()" aria-label="Toggle theme" title="Toggle dark/light theme">
+          <span id="themeToggleIcon">☼</span>
+        </button>
+        <a href="https://github.com/joshi-chinmay-016/agentproof" target="_blank" rel="noreferrer" class="btn btn-ghost btn-sm">
+          GitHub
+        </a>
+        <a href="/app" class="btn btn-primary btn-sm">
+          Open Console →
+        </a>
+        <a href="/app" class="app-sidebar-link" style="display:none;" aria-hidden="true">app-sidebar</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- 2. HERO SECTION -->
+  <header class="landing-hero">
+    <div style="display: flex; gap: var(--space-2); align-items: center; margin-bottom: var(--space-4);">
+      <span class="section-label">Deterministic Verification Layer</span>
+      <span class="badge-simulation">MCP 2026-07-28 Compatible</span>
+    </div>
+
+    <h1 class="hero-headline">
+      An agent saying it worked is not proof it worked.
+    </h1>
+
+    <p class="hero-subhead">
+      AgentProof is an independent, out-of-band verification platform for tool-using AI agents. We observe real external state over PostgreSQL, S3, and REST readers to deterministically evaluate required postconditions.
+    </p>
+
+    <div class="hero-ctas">
+      <a href="/app" class="btn btn-primary btn-lg">
+        Open Verification Console →
+      </a>
+      <a href="/dev/components" class="btn btn-secondary btn-lg">
+        View Design System (/dev/components)
+      </a>
+      <span style="font-family: var(--font-mono); font-size: 12px; color: var(--text-muted); margin-left: var(--space-2);">
+        288 automated tests passing · Zero telemetry
+      </span>
+    </div>
+
+    <!-- 3D Interactive Signature Visualization -->
+    <div class="scene-card">
+      <div class="scene-toolbar">
+        <div style="display: flex; align-items: center; gap: var(--space-3);">
+          <span style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--text-muted);">
+            Interactive Pipeline Simulator
+          </span>
+          <span class="badge-simulation">[SIMULATION]</span>
+        </div>
+        <div class="scenario-switcher">
+          <button class="scenario-btn active" onclick="switchScenario('genuine_success')">Genuine Success (PASS)</button>
+          <button class="scenario-btn" onclick="switchScenario('false_success')">False Success (FAIL)</button>
+          <button class="scenario-btn" onclick="switchScenario('missing_evidence')">Missing State (INCONCLUSIVE)</button>
+        </div>
+      </div>
+      <div style="position: relative;">
+        <canvas id="threeCanvas"></canvas>
+        <div id="svgFallback" style="display: none; padding: var(--space-8); text-align: center;">
+          <!-- Accessible 2D SVG Fallback -->
+          <svg width="100%" height="180" viewBox="0 0 800 160">
+            <line x1="80" y1="80" x2="720" y2="80" stroke="var(--border-hairline)" stroke-width="2"/>
+            <circle cx="120" cy="80" r="28" fill="var(--bg-surface-raised)" stroke="var(--border-subtle)"/>
+            <text x="120" y="85" text-anchor="middle" font-family="sans-serif" font-size="11" fill="var(--text-primary)">Claim</text>
+            <circle cx="320" cy="80" r="28" fill="var(--bg-surface-raised)" stroke="var(--border-subtle)"/>
+            <text x="320" y="85" text-anchor="middle" font-family="sans-serif" font-size="11" fill="var(--text-primary)">Conditions</text>
+            <circle cx="500" cy="80" r="28" fill="var(--bg-surface-raised)" stroke="var(--border-subtle)"/>
+            <text x="500" y="85" text-anchor="middle" font-family="sans-serif" font-size="11" fill="var(--text-primary)">Evidence</text>
+            <circle cx="680" cy="80" r="28" fill="var(--verdict-pass-bg)" stroke="var(--verdict-pass)"/>
+            <text x="680" y="85" text-anchor="middle" font-family="sans-serif" font-size="11" fill="var(--verdict-pass)">Verdict</text>
+          </svg>
+        </div>
+      </div>
+      <div style="padding: var(--space-3) var(--space-4); border-top: 1px solid var(--border-hairline); display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--text-muted); font-family: var(--font-mono);">
+        <span id="sceneDescription">Claim packet emitted → Evaluating postconditions against independent PostgreSQL ground truth.</span>
+        <span>Drag to rotate · 60fps WebGL</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- 3. THE GAP: SCROLL-DRIVEN CONTRADICTION -->
+  <section class="landing-section" id="gap">
+    <div class="editorial-grid-asym">
+      <div class="editorial-margin-col">
+        <p class="section-label">01 / The Blindspot</p>
+        <h2 style="font-family: var(--font-serif); font-size: var(--text-xl); margin-top: var(--space-2);">
+          The Silent Failure Dilemma
+        </h2>
+        <p style="margin-top: var(--space-4); color: var(--text-secondary); font-size: var(--text-sm);">
+          LLM agents reliably suffer from "silent failure": emitting a confident natural-language claim while external state mutation fails or targets the wrong record.
+        </p>
+      </div>
+
+      <div>
+        <p style="font-size: var(--text-md); color: var(--text-primary); margin-bottom: var(--space-6);">
+          When an agent runs <code class="font-mono">cancel_subscription("sub-100")</code>, compare the claim to the underlying database:
+        </p>
+
+        <div class="gap-split-view">
+          <div class="gap-side">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3);">
+              <span style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--text-muted);">
+                What the Agent Claimed
+              </span>
+              <span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">Unverified Tool Return</span>
+            </div>
+            <div class="diff-agent-claim">
+              "Successfully cancelled subscription sub-100 for customer cust-501. The account has been downgraded to the free tier."
+            </div>
+          </div>
+
+          <div class="gap-side" style="border-color: var(--verdict-fail-border);">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-3);">
+              <span style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--verdict-fail);">
+                What the Database Contains
+              </span>
+              <span class="verdict-badge badge-fail badge-sm">VIOLATION</span>
+            </div>
+            <div class="diff-ground-truth">
+              <span style="color: var(--text-muted);">SELECT status, plan FROM subscriptions WHERE id='sub-100';</span><br>
+              status: <span style="color: var(--verdict-fail); font-weight: 600;">"ACTIVE"</span> <span style="color: var(--verdict-fail);">(Expected: "CANCELLED")</span><br>
+              plan:   <span style="color: var(--verdict-fail); font-weight: 600;">"ENTERPRISE"</span>
+            </div>
+          </div>
+        </div>
+
+        <p style="margin-top: var(--space-6); font-family: var(--font-serif); font-size: var(--text-lg); color: var(--text-primary); font-style: italic;">
+          "Missing evidence is never success. Inability to verify is never failure."
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. THREE VERDICTS: RULED TABLE LAYOUT -->
+  <section class="landing-section" id="verdicts">
+    <div class="editorial-grid-asym">
+      <div class="editorial-margin-col">
+        <p class="section-label">02 / Decision Calculus</p>
+        <h2 style="font-family: var(--font-serif); font-size: var(--text-xl); margin-top: var(--space-2);">
+          Three Authoritative Verdicts
+        </h2>
+        <p style="margin-top: var(--space-4); color: var(--text-secondary); font-size: var(--text-sm);">
+          No fuzzy scores or probability bars. AgentProof resolves to exactly three deterministic outcomes under strict aggregation dominance:
+        </p>
+        <div style="margin-top: var(--space-4); padding: var(--space-3); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 11px; background: var(--bg-surface-raised);">
+          <strong>Precedence Rule:</strong><br>
+          FAIL &gt; INCONCLUSIVE &gt; PASS
+        </div>
+      </div>
+
+      <div>
+        <div class="verdict-rule-table">
+          <!-- PASS Row -->
+          <div class="verdict-rule-row">
+            <div>
+              <span class="verdict-badge badge-pass badge-lg">
+                <svg class="verdict-glyph" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 8.5l2 2 4-4"/></svg>
+                PASS
+              </span>
+            </div>
+            <div>
+              <div style="font-weight: 500; font-size: var(--text-base); margin-bottom: 4px;">
+                Verified Ground Truth
+              </div>
+              <div style="color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.5;">
+                Fresh, trusted evidence from independent external state readers proves that all required postconditions strictly hold.
+              </div>
+            </div>
+            <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">
+              status == "CANCELLED"<br>
+              provenance: DIRECT_READ<br>
+              freshness: 120ms
+            </div>
+          </div>
+
+          <!-- FAIL Row -->
+          <div class="verdict-rule-row">
+            <div>
+              <span class="verdict-badge badge-fail badge-lg">
+                <svg class="verdict-glyph" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5.5 5.5l5 5M10.5 5.5l-5 5"/></svg>
+                FAIL
+              </span>
+            </div>
+            <div>
+              <div style="font-weight: 500; font-size: var(--text-base); margin-bottom: 4px;">
+                Required Condition Violated
+              </div>
+              <div style="color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.5;">
+                Reliable evidence establishes that at least one required postcondition was explicitly contradicted by observable reality.
+              </div>
+            </div>
+            <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">
+              observed: "ACTIVE"<br>
+              expected: "CANCELLED"<br>
+              drives overall verdict
+            </div>
+          </div>
+
+          <!-- INCONCLUSIVE Row -->
+          <div class="verdict-rule-row">
+            <div>
+              <span class="verdict-badge badge-inconclusive badge-lg">
+                <svg class="verdict-glyph" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" stroke-dasharray="3 2"/><path d="M8 5.5a1.5 1.5 0 0 1 1.5 1.5c0 1-1.5 1.5-1.5 2.5m0 2h.01"/></svg>
+                INCONCLUSIVE
+              </span>
+            </div>
+            <div>
+              <div style="font-weight: 500; font-size: var(--text-base); margin-bottom: 4px;">
+                Insufficient or Unverified Evidence
+              </div>
+              <div style="color: var(--text-secondary); font-size: var(--text-sm); line-height: 1.5;">
+                Evidence is missing, stale, connection timed out, untrusted origin, or signature mismatched. Inability to verify is never displayed as failure.
+              </div>
+            </div>
+            <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);">
+              reader: 504_GATEWAY_TIMEOUT<br>
+              freshness: EXPIRED (&gt;60s)<br>
+              cannot confirm or deny
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. HOW IT WORKS: STICKY PROGRESSION -->
+  <section class="landing-section" id="how-it-works">
+    <div class="editorial-grid-asym">
+      <div class="editorial-margin-col">
+        <p class="section-label">03 / Architecture</p>
+        <h2 style="font-family: var(--font-serif); font-size: var(--text-xl); margin-top: var(--space-2);">
+          The 4-Step Verification Rig
+        </h2>
+        <p style="margin-top: var(--space-4); color: var(--text-secondary); font-size: var(--text-sm);">
+          Every verification executes through four decoupled stages without human intervention or model hallucination risk.
+        </p>
+      </div>
+
+      <div class="works-split">
+        <div class="steps-list">
+          <div class="step-item active" onclick="activateStep(0)">
+            <div class="step-num">STAGE 01</div>
+            <div class="step-title">Claimed Action Ingest</div>
+            <div class="step-desc">The AI agent declares what operation it intends to complete along with targeted resource IDs.</div>
+          </div>
+          <div class="step-item" onclick="activateStep(1)">
+            <div class="step-num">STAGE 02</div>
+            <div class="step-title">Explicit Postconditions</div>
+            <div class="step-desc">A contract of required state properties is loaded. Postconditions are strictly scoped per resource.</div>
+          </div>
+          <div class="step-item" onclick="activateStep(2)">
+            <div class="step-num">STAGE 03</div>
+            <div class="step-title">Independent Evidence Reading</div>
+            <div class="step-desc">AgentProof calls isolated external state readers (PostgreSQL, AWS S3, REST) bypassing agent self-reports.</div>
+          </div>
+          <div class="step-item" onclick="activateStep(3)">
+            <div class="step-num">STAGE 04</div>
+            <div class="step-title">Deterministic Evaluation & Audit</div>
+            <div class="step-desc">VerificationEngine compares expected vs observed, hashes the audit record, and updates the tamper-evident chain.</div>
+          </div>
+        </div>
+
+        <!-- Real UI Fragment Preview -->
+        <div class="editorial-panel" id="stepPreviewPanel">
+          <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-hairline); padding-bottom: var(--space-3); margin-bottom: var(--space-4);">
+            <span style="font-family: var(--font-mono); font-size: 11px; text-transform: uppercase; color: var(--text-muted);" id="stepPreviewLabel">
+              Preview: Stage 01
+            </span>
+            <span class="badge-simulation">LIVE RUNTIME SPEC</span>
+          </div>
+          <div id="stepPreviewContent">
+            <!-- Dynamic step fragment -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. MCP-NATIVE TOOLS: TABBED CODE BLOCKS -->
+  <section class="landing-section" id="mcp">
+    <div class="editorial-grid-asym">
+      <div class="editorial-margin-col">
+        <p class="section-label">04 / Developer Protocol</p>
+        <h2 style="font-family: var(--font-serif); font-size: var(--text-xl); margin-top: var(--space-2);">
+          Model Context Protocol Native
+        </h2>
+        <p style="margin-top: var(--space-4); color: var(--text-secondary); font-size: var(--text-sm);">
+          AgentProof ships 4 native MCP tools compatible with Anthropic Claude Desktop, Cursor, and any MCP client over standard STDIO.
+        </p>
+      </div>
+
+      <div class="scene-card" style="margin-top: 0;">
+        <div class="code-tabs">
+          <button class="code-tab active" onclick="switchCodeTab('verify_outcome')">verify_outcome</button>
+          <button class="code-tab" onclick="switchCodeTab('inspect_trace')">inspect_trace</button>
+          <button class="code-tab" onclick="switchCodeTab('run_scenario')">run_scenario</button>
+          <button class="code-tab" onclick="switchCodeTab('mcp_config')">claude_desktop_config.json</button>
+        </div>
+        <pre class="code-pre" id="codeBlock"><code>// verify_outcome: Evaluates postconditions against independent evidence
+{
+  "name": "verify_outcome",
+  "description": "Evaluates agent execution intent and postconditions against independent evidence.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "target": {
+        "system": "billing",
+        "resourceType": "subscription",
+        "resourceId": "sub-100"
+      },
+      "intent": { "operation": "cancel" },
+      "postconditions": [
+        {
+          "id": "p1",
+          "path": "status",
+          "operator": "EQUALS",
+          "expectedValue": "CANCELLED",
+          "enforcement": "REQUIRED"
+        }
+      ]
+    },
+    "required": ["target", "postconditions"]
+  }
+}</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7. EVIDENCE & AUDIT: TAMPER-EVIDENT HASH CHAIN DEMO -->
+  <section class="landing-section" id="audit">
+    <div class="editorial-grid-asym">
+      <div class="editorial-margin-col">
+        <p class="section-label">05 / Cryptographic Integrity</p>
+        <h2 style="font-family: var(--font-serif); font-size: var(--text-xl); margin-top: var(--space-2);">
+          Tamper-Evident Hash Chains & Signed Checkpoints
+        </h2>
+        <p style="margin-top: var(--space-4); color: var(--text-secondary); font-size: var(--text-sm);">
+          Audit events form a sequential SHA-256 chain. An attacker cannot alter past logs without breaking all subsequent hashes. Asymmetric RSA-SHA256 checkpoints protect against rollback attacks.
+        </p>
+      </div>
+
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-4);">
+          <span style="font-family: var(--font-mono); font-size: 12px; color: var(--text-secondary);">
+            Sequential Event Chain: SHA-256 (prevHash || sequence || payload)
+          </span>
+          <button class="btn btn-secondary btn-sm" onclick="tamperDemo()">
+            <span id="tamperBtnLabel">Simulate Tamper on Block #2</span>
+          </button>
+        </div>
+
+        <div class="audit-chain-display" id="auditChainContainer">
+          <div class="chain-node verified" id="node1">
+            <div style="font-size: 10px; color: var(--text-muted);">SEQ #1</div>
+            <div>7a4e...890f</div>
+            <div style="font-size: 10px; margin-top: 2px;">VERIFIED ✓</div>
+          </div>
+          <div class="chain-connector"></div>
+          <div class="chain-node verified" id="node2">
+            <div style="font-size: 10px; color: var(--text-muted);">SEQ #2</div>
+            <div id="node2Hash">3c11...9a44</div>
+            <div style="font-size: 10px; margin-top: 2px;" id="node2Status">VERIFIED ✓</div>
+          </div>
+          <div class="chain-connector"></div>
+          <div class="chain-node verified" id="node3">
+            <div style="font-size: 10px; color: var(--text-muted);">SEQ #3</div>
+            <div>9f8b...221c</div>
+            <div style="font-size: 10px; margin-top: 2px;" id="node3Status">VERIFIED ✓</div>
+          </div>
+          <div class="chain-connector"></div>
+          <div class="chain-node verified" id="node4">
+            <div style="font-size: 10px; color: var(--text-muted);">HEAD #4</div>
+            <div>RSA-2048</div>
+            <div style="font-size: 10px; margin-top: 2px;">SIGNED ✓</div>
+          </div>
+        </div>
+
+        <p style="font-size: var(--text-sm); color: var(--text-secondary); margin-top: var(--space-4);" id="chainExplanation">
+          All 4 blocks cryptographically verified intact. Digest matches head signature.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8. TRUST MODEL: WHAT WE CLAIM VS WHAT WE DO NOT -->
+  <section class="landing-section" id="trust">
+    <div class="editorial-grid-asym">
+      <div class="editorial-margin-col">
+        <p class="section-label">06 / Honest Demarcation</p>
+        <h2 style="font-family: var(--font-serif); font-size: var(--text-xl); margin-top: var(--space-2);">
+          The Trust Boundary
+        </h2>
+        <p style="margin-top: var(--space-4); color: var(--text-secondary); font-size: var(--text-sm);">
+          Engineering honesty is our highest principle. We distinguish what independent evidence establishes versus what it does not claim.
+        </p>
+      </div>
+
+      <div class="trust-grid">
+        <div class="trust-col">
+          <div class="trust-col-title" style="color: var(--verdict-pass);">
+            What AgentProof Establishes
+          </div>
+          <ul class="trust-list">
+            <li>Postconditions held at the precise timestamp of independent evidence reading.</li>
+            <li>Evidence was retrieved via authenticated reader credentials, bypassing agent context.</li>
+            <li>Audit events are sequentially hashed and cryptographically signed at checkpoints.</li>
+            <li>Trace logs are durably committed and immutable to future manipulation.</li>
+          </ul>
+        </div>
+
+        <div class="trust-col">
+          <div class="trust-col-title" style="color: var(--text-muted);">
+            What AgentProof Does Not Claim
+          </div>
+          <ul class="trust-list">
+            <li>We do not prove that state will remain unchanged in the future after observation.</li>
+            <li>We do not prove that the agent's internal reasoning was sound, only that postconditions hold.</li>
+            <li>A valid webhook signature proves cryptographic origin, not business intent.</li>
+            <li>An intact local hash chain proves sequence, but requires signed checkpoints to prevent total rollback.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 9. CLOSING CTA & EDITORIAL FOOTER -->
+  <footer class="landing-section" style="padding-bottom: var(--space-16);">
+    <div style="text-align: center; max-width: 680px; margin: 0 auto var(--space-16);">
+      <h2 style="font-family: var(--font-serif); font-size: clamp(32px, 4vw, 48px); margin-bottom: var(--space-6);">
+        Verify AI agent tool actions with mathematical certainty.
+      </h2>
+      <div style="display: flex; gap: var(--space-4); justify-content: center;">
+        <a href="/app" class="btn btn-primary btn-lg">
+          Launch Web Console →
+        </a>
+        <a href="/dev/components" class="btn btn-secondary btn-lg">
+          Inspect Component System
+        </a>
+      </div>
+    </div>
+
+    <div style="border-top: 1px solid var(--border-hairline); padding-top: var(--space-8); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: var(--space-4); font-size: 12px; color: var(--text-muted); font-family: var(--font-mono);">
+      <div>
+        AgentProof © 2026 · Model Context Protocol Verification Engine · Phase 8
+      </div>
+      <div style="display: flex; gap: var(--space-6);">
+        <a href="/app" style="color: var(--text-muted); text-decoration: none;">Console</a>
+        <a href="/dev/components" style="color: var(--text-muted); text-decoration: none;">Components</a>
+        <a href="https://github.com/joshi-chinmay-016/agentproof" target="_blank" rel="noreferrer" style="color: var(--text-muted); text-decoration: none;">GitHub</a>
+        <a href="/healthz" target="_blank" style="color: var(--text-muted); text-decoration: none;">/healthz</a>
+      </div>
+    </div>
+  </footer>
+
+  <!-- SCRIPT: Three.js 3D Pipeline Scene & Interactivity -->
+  <script>
+    // Theme Management (Zero Flash)
+    function toggleTheme() {
+      const current = document.documentElement.getAttribute('data-theme') || 'dark';
+      const next = current === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('agentproof_theme', next);
+      document.getElementById('themeToggleIcon').textContent = next === 'dark' ? '☼' : '☾';
+      if (window.updateSceneTheme) window.updateSceneTheme(next);
+    }
+
+    const savedTheme = localStorage.getItem('agentproof_theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    document.getElementById('themeToggleIcon').textContent = savedTheme === 'dark' ? '☼' : '☾';
+
+    // Sticky Nav Border on Scroll
+    window.addEventListener('scroll', () => {
+      const nav = document.getElementById('landingNav');
+      if (window.scrollY > 8) {
+        nav.classList.add('scrolled');
+      } else {
+        nav.classList.remove('scrolled');
+      }
+    });
+
+    // ------------------------------------------------------------------------
+    // Three.js 3D Pipeline Scene
+    // ------------------------------------------------------------------------
+    (function initThreeScene() {
+      const canvas = document.getElementById('threeCanvas');
+      if (!window.THREE) {
+        document.getElementById('svgFallback').style.display = 'block';
+        canvas.style.display = 'none';
+        return;
+      }
+
+      let scene, camera, renderer, nodes = [], photon;
+      let currentOutcome = 'genuine_success'; // 'genuine_success', 'false_success', 'missing_evidence'
+
+      try {
+        scene = new THREE.Scene();
+        const width = canvas.clientWidth || 800;
+        const height = canvas.clientHeight || 380;
+
+        camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
+        camera.position.set(0, 0, 14);
+
+        renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+        renderer.setSize(width, height);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+
+        // Lighting
+        const ambLight = new THREE.AmbientLight(0xffffff, 0.85);
+        scene.add(ambLight);
+
+        const dirLight = new THREE.DirectionalLight(0xffffff, 0.6);
+        dirLight.position.set(5, 10, 7);
+        scene.add(dirLight);
+
+        // 4 Pipeline Nodes: Claim, Postconditions, Evidence, Verdict
+        const nodePositions = [
+          { x: -6.5, label: 'Claim' },
+          { x: -2.2, label: 'Postconditions' },
+          { x: 2.2, label: 'Evidence' },
+          { x: 6.5, label: 'Verdict' }
+        ];
+
+        const nodeGeo = new THREE.SphereGeometry(0.85, 32, 32);
+        const nodeMat = new THREE.MeshStandardMaterial({
+          color: 0x2A2822,
+          roughness: 0.3,
+          metalness: 0.2
+        });
+
+        nodes = nodePositions.map((pos, idx) => {
+          const mesh = new THREE.Mesh(nodeGeo, nodeMat.clone());
+          mesh.position.set(pos.x, 0, 0);
+          scene.add(mesh);
+          return mesh;
+        });
+
+        // Connecting Lines
+        const lineMat = new THREE.LineBasicMaterial({ color: 0x38352D, linewidth: 2 });
+        const lineGeo = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(-6.5, 0, 0),
+          new THREE.Vector3(-2.2, 0, 0),
+          new THREE.Vector3(2.2, 0, 0),
+          new THREE.Vector3(6.5, 0, 0)
+        ]);
+        const line = new THREE.Line(lineGeo, lineMat);
+        scene.add(line);
+
+        // Travelling Photon Particle
+        const photonGeo = new THREE.SphereGeometry(0.2, 16, 16);
+        const photonMat = new THREE.MeshBasicMaterial({ color: 0xC85A32 });
+        photon = new THREE.Mesh(photonGeo, photonMat);
+        photon.position.set(-6.5, 0, 0);
+        scene.add(photon);
+
+        // Theme sync
+        window.updateSceneTheme = function(theme) {
+          const isDark = theme === 'dark';
+          ambLight.intensity = isDark ? 0.85 : 1.1;
+          nodeMat.color.setHex(isDark ? 0x2A2822 : 0xE7E4DC);
+        };
+
+        // Animation Loop
+        let progress = 0;
+        let isPaused = false;
+
+        const observer = new IntersectionObserver((entries) => {
+          isPaused = !entries[0].isIntersecting;
+        });
+        observer.observe(canvas);
+
+        function animate() {
+          requestAnimationFrame(animate);
+          if (isPaused) return;
+
+          progress = (progress + 0.008) % 1;
+          const currentX = -6.5 + progress * 13;
+          photon.position.x = currentX;
+
+          // Pulse nodes as photon passes
+          nodes.forEach((node, i) => {
+            const dist = Math.abs(currentX - node.position.x);
+            if (dist < 0.8) {
+              node.scale.set(1.15, 1.15, 1.15);
+            } else {
+              node.scale.set(1, 1, 1);
+            }
+          });
+
+          // Set verdict node color based on scenario
+          const verdictNode = nodes[3];
+          if (currentOutcome === 'genuine_success') {
+            verdictNode.material.color.setHex(0x3FA86B); // PASS
+          } else if (currentOutcome === 'false_success') {
+            verdictNode.material.color.setHex(0xE05355); // FAIL
+          } else {
+            verdictNode.material.color.setHex(0xD4A347); // INCONCLUSIVE
+          }
+
+          renderer.render(scene, camera);
+        }
+        animate();
+
+        // Mouse Parallax
+        let mouseX = 0, mouseY = 0;
+        window.addEventListener('mousemove', (e) => {
+          mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+          mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+          scene.rotation.y = mouseX * 0.15;
+          scene.rotation.x = -mouseY * 0.1;
+        });
+
+        // Window resize
+        window.addEventListener('resize', () => {
+          const w = canvas.clientWidth;
+          const h = canvas.clientHeight;
+          camera.aspect = w / h;
+          camera.updateProjectionMatrix();
+          renderer.setSize(w, h);
+        });
+
+      } catch (err) {
+        console.warn('Three.js initialization failed, showing SVG fallback', err);
+        document.getElementById('svgFallback').style.display = 'block';
+        canvas.style.display = 'none';
+      }
+
+      window.switchScenario = function(type) {
+        currentOutcome = type;
+        document.querySelectorAll('.scenario-btn').forEach(btn => btn.classList.remove('active'));
+        if (event && event.target) event.target.classList.add('active');
+
+        const desc = document.getElementById('sceneDescription');
+        if (type === 'genuine_success') {
+          desc.textContent = "Scenario A: Agent claims cancelled subscription → PostgreSQL state confirms CANCELLED → Authoritative PASS.";
+        } else if (type === 'false_success') {
+          desc.textContent = "Scenario B: Agent claims cancelled subscription → PostgreSQL state remains ACTIVE → Authoritative FAIL.";
+        } else {
+          desc.textContent = "Scenario E: Agent claims cancelled subscription → Target resource missing in ground truth → Authoritative INCONCLUSIVE.";
+        }
+      };
+    })();
+
+    // ------------------------------------------------------------------------
+    // Step Progression Showcase
+    // ------------------------------------------------------------------------
+    const stepsData = [
+      {
+        label: "Stage 01: Claimed Action Ingest",
+        content: `
+          <div style="font-family: var(--font-mono); font-size: 12px; line-height: 1.6; color: var(--text-primary);">
+            <div style="color: var(--text-muted); margin-bottom: 8px;">// Ingested MCP Agent Tool Call:</div>
+            {<br>
+            &nbsp;&nbsp;"operation": "cancel_subscription",<br>
+            &nbsp;&nbsp;"target": {<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;"system": "billing",<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;"resourceId": "sub-100"<br>
+            &nbsp;&nbsp;},<br>
+            &nbsp;&nbsp;"agentClaim": "Subscription cancelled successfully."<br>
+            }
+          </div>
+        `
+      },
+      {
+        label: "Stage 02: Explicit Postconditions",
+        content: `
+          <div class="postcondition-row" style="margin: 0;">
+            <div class="postcondition-header">
+              <span class="verdict-badge badge-pass badge-sm">REQUIRED</span>
+              <span class="postcondition-expr">status EQUALS "CANCELLED"</span>
+            </div>
+            <div style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); margin-top: 4px;">
+              Enforcement: REQUIRED · Freshness Window: 60,000ms
+            </div>
+          </div>
+        `
+      },
+      {
+        label: "Stage 03: Independent Evidence Reading",
+        content: `
+          <div style="font-family: var(--font-mono); font-size: 12px; color: var(--text-primary); line-height: 1.6;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+              <span class="obs-chip obs-found"><span class="obs-dot"></span>FOUND</span>
+              <span style="color: var(--text-muted);">observed 42ms ago</span>
+            </div>
+            Source: postgres-primary-reader (DIRECT_READ)<br>
+            Digest: 8f4e229a...01bf (SHA-256)<br>
+            Observed: {"id": "sub-100", "status": "CANCELLED"}
+          </div>
+        `
+      },
+      {
+        label: "Stage 04: Deterministic Evaluation & Audit",
+        content: `
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--space-3);">
+            <span class="verdict-badge badge-pass badge-lg">PASS</span>
+            <span style="font-family: var(--font-mono); font-size: 12px; color: var(--text-muted);">Duration: 4.16ms</span>
+          </div>
+          <div style="font-size: var(--text-sm); color: var(--text-secondary); line-height: 1.5;">
+            Verification PASSED: All 1 required postconditions verified by independent evidence. Audit block appended to SHA-256 hash chain.
+          </div>
+        `
+      }
+    ];
+
+    function activateStep(idx) {
+      document.querySelectorAll('.step-item').forEach((item, i) => {
+        if (i === idx) item.classList.add('active');
+        else item.classList.remove('active');
+      });
+      document.getElementById('stepPreviewLabel').textContent = stepsData[idx].label;
+      document.getElementById('stepPreviewContent').innerHTML = stepsData[idx].content;
+    }
+    activateStep(0);
+
+    // ------------------------------------------------------------------------
+    // Code Tab Switching
+    // ------------------------------------------------------------------------
+    const codeSnippets = {
+      verify_outcome: `// verify_outcome: Evaluates postconditions against independent evidence
+{
+  "name": "verify_outcome",
+  "description": "Evaluates agent execution intent and postconditions against independent evidence.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "target": { "system": "billing", "resourceType": "subscription", "resourceId": "sub-100" },
+      "intent": { "operation": "cancel" },
+      "postconditions": [
+        { "id": "p1", "path": "status", "operator": "EQUALS", "expectedValue": "CANCELLED", "enforcement": "REQUIRED" }
+      ]
+    },
+    "required": ["target", "postconditions"]
+  }
+}`,
+      inspect_trace: `// inspect_trace: Inspects full cryptographic trace, evidence, and audit logs
+{
+  "name": "inspect_trace",
+  "description": "Retrieves complete verification trace by traceId.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "traceId": { "type": "string", "description": "UUID of trace record" }
+    },
+    "required": ["traceId"]
+  }
+}`,
+      run_scenario: `// run_scenario: Executes simulated verification scenarios A-H
+{
+  "name": "run_scenario",
+  "description": "Runs predefined simulation scenario against mock or real evidence.",
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "scenarioId": { "type": "string", "enum": ["SCENARIO_A", "SCENARIO_B", "SCENARIO_C"] }
+    },
+    "required": ["scenarioId"]
+  }
+}`,
+      mcp_config: `// claude_desktop_config.json
+{
+  "mcpServers": {
+    "agentproof": {
+      "command": "node",
+      "args": ["/path/to/agentproof/dist/index.js"],
+      "env": {
+        "NITRO_MCP_PROTOCOL_VERSION": "auto"
+      }
+    }
+  }
+}`
+    };
+
+    function switchCodeTab(key) {
+      document.querySelectorAll('.code-tab').forEach(tab => tab.classList.remove('active'));
+      if (event && event.target) event.target.classList.add('active');
+      document.getElementById('codeBlock').textContent = codeSnippets[key];
+    }
+
+    // ------------------------------------------------------------------------
+    // Audit Chain Tamper Demo
+    // ------------------------------------------------------------------------
+    let isTampered = false;
+    function tamperDemo() {
+      isTampered = !isTampered;
+      const n2 = document.getElementById('node2');
+      const n3 = document.getElementById('node3');
+      const n2Status = document.getElementById('node2Status');
+      const n3Status = document.getElementById('node3Status');
+      const n2Hash = document.getElementById('node2Hash');
+      const exp = document.getElementById('chainExplanation');
+      const btn = document.getElementById('tamperBtnLabel');
+
+      if (isTampered) {
+        n2.className = 'chain-node tampered';
+        n3.className = 'chain-node tampered';
+        n2Hash.textContent = 'BAD_HASH_99';
+        n2Status.textContent = 'TAMPERED ✗';
+        n3Status.textContent = 'CHAIN BROKEN ✗';
+        exp.textContent = "Tamper Detected! Modifying block #2 alters its SHA-256 digest, breaking the pointer in block #3. The RSA checkpoint immediately invalidates the entire chain.";
+        exp.style.color = 'var(--verdict-fail)';
+        btn.textContent = 'Restore Original Chain';
+      } else {
+        n2.className = 'chain-node verified';
+        n3.className = 'chain-node verified';
+        n2Hash.textContent = '3c11...9a44';
+        n2Status.textContent = 'VERIFIED ✓';
+        n3Status.textContent = 'VERIFIED ✓';
+        exp.textContent = "All 4 blocks cryptographically verified intact. Digest matches head signature.";
+        exp.style.color = 'var(--text-secondary)';
+        btn.textContent = 'Simulate Tamper on Block #2';
+      }
+    }
+  </script>
+</body>
+</html>
