@@ -2,10 +2,10 @@
 
 > **An MCP-native, cryptographically anchored independent verification engine and developer web console for tool-using AI agents.**
 
-[![Tests](https://img.shields.io/badge/tests-288%20passed-brightgreen.svg)](#testing--verification)
+[![Tests](https://img.shields.io/badge/tests-300%20passed-brightgreen.svg)](#testing--verification)
 [![TypeScript](https://img.shields.io/badge/typescript-strict%205.3-blue.svg)](#architecture)
 [![MCP](https://img.shields.io/badge/protocol-MCP%202026--07--28-orange.svg)](#mcp-protocol--tools)
-[![Console](https://img.shields.io/badge/console-Phase%208%20Ready-purple.svg)](#agentproof-web-console)
+[![Console](https://img.shields.io/badge/console-Production%20Ready-purple.svg)](#agentproof-web-console)
 
 ---
 
@@ -31,9 +31,9 @@ When an AI agent reports *"I have cancelled the customer's subscription"* or *"I
 
 ---
 
-## AgentProof Web Console (Phase 8)
+## AgentProof Web Console
 
-Phase 8 introduces the **AgentProof Developer Security Console**, engineered with Tier-1 developer platform discipline (Linear, Vercel, Stripe, Anthropic Console).
+The **AgentProof Developer Security Console** is engineered with Tier-1 developer platform discipline (Linear, Vercel, Stripe, Anthropic Console).
 
 ### Console Views & Features
 
@@ -144,24 +144,55 @@ AgentProof implements the Model Context Protocol (stateless spec `2026-07-28` an
 
 ---
 
+## Authenticated Verification REST API & Python Agent Integration
+
+AgentProof exposes a first-class, authenticated HTTP verification API for real AI agents, microservices, and external callers.
+
+### Core API Endpoints
+
+| Method | Endpoint | Description | Auth Required |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/api/v1/verifications` | Submits agent action & postconditions for independent REST verification | Bearer Token (`demo-corp-key`) |
+| `GET` | `/api/v1/verifications/:id` | Retrieves authoritative verdict, condition evaluations, and trace | Bearer Token |
+| `GET` | `/api/v1/verifications/:id/evidence` | Retrieves independent evidence with sensitive credentials redacted | Bearer Token |
+| `GET` | `/api/v1/verifications` | Lists tenant-scoped verifications with filter/search parameters | Bearer Token |
+
+### Python Agent & Test Business Service
+
+Run the end-to-end integration with standard Python 3 (zero dependencies):
+
+```bash
+# 1. Start the business REST service (stores real customer records on port 4000)
+python agentproof/examples/test-customer-service/server.py
+
+# 2. Start AgentProof console and verification engine (port 3000)
+cd agentproof && npm run console
+
+# 3. Run the autonomous Python AI agent
+python agentproof/examples/python-agent/agent_verify.py --all
+```
+
+---
+
 ## Architecture
 
 ```
                     ┌────────────────────────────────────────┐
-                    │               AI AGENT                 │
-                    │   (Claims: "Subscription Cancelled")   │
+                    │          AI AGENT (Python / SDK)       │
+                    │   (Claims: "Customer Created/Updated") │
                     └───────────────────┬────────────────────┘
-                                        │ Intent & Postconditions
+                                        │ Intent & Postconditions (REST API / MCP)
                                         ▼
 ┌────────────────────────────────────────────────────────────────────────┐
 │                        AGENTPROOF PLATFORM                             │
 │                                                                        │
-│   ┌────────────────────┐   ┌────────────────────┐                      │
-│   │   MCP STDIO Tool   │   │ Webhook Ingestion  │                      │
-│   │  (verify_outcome)  │   │  (HMAC/RSA Signed) │                      │
-│   └─────────┬──────────┘   └─────────┬──────────┘                      │
-│             │                        │                                 │
-│             ▼                        ▼                                 │
+│   ┌────────────────────┐   ┌────────────────────┐   ┌────────────────┐ │
+│   │   MCP STDIO Tool   │   │ Webhook Ingestion  │   │ REST Verif API │ │
+│   │  (verify_outcome)  │   │  (HMAC/RSA Signed) │   │ (/api/v1/...)  │ │
+│   └─────────┬──────────┘   └─────────┬──────────┘   └───────┬────────┘ │
+│             │                        │                      │          │
+│             └───────────────────┬────┴──────────────────────┘          │
+│                                 ▼                                      │
 │   ┌──────────────────────────────────────────────┐                     │
 │   │       Independent State Readers & Cache      │                     │
 │   │    (PostgreSQL, AWS S3, External REST APIs)  │                     │
@@ -199,10 +230,10 @@ AgentProof implements the Model Context Protocol (stateless spec `2026-07-28` an
 
 ## Testing & Verification
 
-The test suite validates domain logic, condition evaluation, concurrency, cryptographic audit chains, webhook signature verification, secret masking, MCP tool registrations, and web console endpoints.
+The test suite validates domain logic, condition evaluation, concurrency, cryptographic audit chains, webhook signature verification, secret masking, MCP tool registrations, end-to-end REST verification, and web console endpoints.
 
 ```bash
-# Run all 43 test suites (288 tests)
+# Run all 44 test suites (300 tests)
 npm test
 
 # Run TypeScript strict typecheck
@@ -213,11 +244,15 @@ node scripts/console-smoke-test.mjs
 
 # Run MCP STDIO protocol smoke test
 node scripts/protocol-smoke-test.mjs
+
+# Run End-to-End REST Verification suite
+npx vitest run tests/e2e/rest-verification.test.ts
 ```
 
 ### Test Coverage Summary
 
-- **43 Test Files**: 288 passing tests, 0 failures.
+- **44 Test Files**: 300 passing tests, 0 failures.
+- **End-to-End Verification**: `tests/e2e/rest-verification.test.ts` (PASS, FAIL, INCONCLUSIVE, SSRF guard, tenant isolation, client-verdict rejection).
 - **Server API Tests**: `tests/server/console-api.test.ts` & `tests/server/console-server.test.ts`.
 - **MCP Regression Tests**: `tests/mcp/phase-8-mcp-regression.test.ts` guaranteeing zero STDIO stdout leakage.
 - **Cryptographic Tests**: RSA-SHA256 signature verification, replay protection, hash-chain tamper detection, and signed checkpoints.

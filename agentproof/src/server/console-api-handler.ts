@@ -11,15 +11,19 @@
 
 import * as http from 'node:http';
 import * as crypto from 'node:crypto';
+import { z } from 'zod';
 import {
   VerificationEngine,
   IVerifier,
+  VerificationRequest,
   VerificationRequestSchema,
   ActionRecord,
   ActionRecordSchema,
   Evidence,
   EvidenceSchema,
   VerificationTrace,
+  EvidenceTrustValidator,
+  ResourceTarget,
 } from '../core/index.js';
 import { ITraceRepository, FileTraceRepository } from '../persistence/index.js';
 import { ScenarioCatalog, defaultScenarioCatalog } from '../modules/verification/scenario-catalog.js';
@@ -39,7 +43,55 @@ import {
   IIntegrationRegistry,
   defaultIntegrationRegistry,
   IntegrationConfigSchema,
+  RestApiStateReader,
+  S3ObjectStateReader,
+  PostgresStateReader,
+  ExternalEvidenceAdapter,
+  ISecretProvider,
+  EnvironmentSecretProvider,
 } from '../observation/index.js';
+import {
+  IIdentityProvider,
+  ContextIdentityProvider,
+  SecurityPrincipal,
+  Permissions,
+  AuthenticationError,
+  AuthorizationError,
+  TenantAccessDeniedError,
+  IAuthorizationService,
+  DefaultAuthorizationService,
+} from '../security/index.js';
+import {
+  ConditionInputSchema,
+  ActionInputSchema,
+  EvidenceInputSchema,
+  PolicyInputSchema,
+} from '../modules/verification/schemas/verify-outcome.schema.js';
+
+export const V1VerificationPayloadSchema = z.object({
+  requestId: z.string().optional(),
+  integrationId: z.string().optional(),
+  operation: z.string().optional(),
+  target: z.object({
+    system: z.string().min(1, 'Target system must be specified'),
+    resourceType: z.string().min(1, 'Target resourceType must be specified'),
+    resourceId: z.string().min(1, 'Target resourceId must be specified'),
+    tenantId: z.string().optional(),
+  }),
+  intent: z
+    .object({
+      operation: z.string().min(1, 'Operation must be specified'),
+      summary: z.string().default('Verification execution'),
+      expectedChanges: z.record(z.unknown()).default({}),
+    })
+    .optional(),
+  postconditions: z.array(ConditionInputSchema).min(1, 'At least one postcondition is required'),
+  preconditions: z.array(ConditionInputSchema).optional().default([]),
+  action: ActionInputSchema.optional(),
+  evidence: z.array(EvidenceInputSchema).optional().default([]),
+  policy: PolicyInputSchema.optional(),
+  metadata: z.record(z.unknown()).optional(),
+});
 
 export interface ConsoleApiHandlerOptions {
   readonly traceRepository?: ITraceRepository;
@@ -52,6 +104,11 @@ export interface ConsoleApiHandlerOptions {
   readonly scenarioRunner?: ScenarioRunner;
   readonly verifier?: IVerifier;
   readonly allowedOrigins?: readonly string[];
+  readonly identityProvider?: IIdentityProvider;
+  readonly authorizationService?: IAuthorizationService;
+  readonly secretProvider?: ISecretProvider;
+  readonly evidenceTrustValidator?: EvidenceTrustValidator;
+  readonly externalEvidenceAdapter?: ExternalEvidenceAdapter;
 }
 
 export class ConsoleApiHandler {
@@ -65,6 +122,11 @@ export class ConsoleApiHandler {
   private readonly scenarioRunner: ScenarioRunner;
   private readonly verifier: IVerifier;
   private readonly allowedOrigins: readonly string[];
+  private readonly identityProvider: IIdentityProvider;
+  private readonly authorizationService: IAuthorizationService;
+  private readonly secretProvider: ISecretProvider;
+  private readonly evidenceTrustValidator: EvidenceTrustValidator;
+  private readonly externalEvidenceAdapter: ExternalEvidenceAdapter;
 
   // Asymmetric test keypair for creating signed audit checkpoints
   private readonly checkpointKeyPair = crypto.generateKeyPairSync('rsa', {
@@ -84,6 +146,65 @@ export class ConsoleApiHandler {
     this.scenarioRunner = options.scenarioRunner ?? new ScenarioRunner();
     this.verifier = options.verifier ?? new VerificationEngine();
     this.allowedOrigins = options.allowedOrigins ?? ['*'];
+
+    // Setup Identity & Authorization
+    const defaultPrincipals: Record<string, SecurityPrincipal> = {
+      'agentproof-dev-key': {
+        principalId: 'dev-python-agent',
+        tenantId: 'default-tenant',
+        principalType: 'AGENT',
+        permissions: [
+          Permissions.VERIFY_EXECUTE,
+          Permissions.TRACE_READ,
+          Permissions.TRACE_WRITE,
+          Permissions.SCENARIO_RUN,
+        ],
+        authMethod: 'API_KEY',
+        metadata: { role: 'python-agent', environment: 'development' },
+      },
+      'tenant-a-key': {
+        principalId: 'agent-tenant-a',
+        tenantId: 'tenant-a',
+        principalType: 'AGENT',
+        permissions: [Permissions.VERIFY_EXECUTE, Permissions.TRACE_READ, Permissions.TRACE_WRITE],
+        authMethod: 'API_KEY',
+        metadata: { tenant: 'tenant-a' },
+      },
+      'tenant-b-key': {
+        principalId: 'agent-tenant-b',
+        tenantId: 'tenant-b',
+        principalType: 'AGENT',
+        permissions: [Permissions.VERIFY_EXECUTE, Permissions.TRACE_READ, Permissions.TRACE_WRITE],
+        authMethod: 'API_KEY',
+        metadata: { tenant: 'tenant-b' },
+      },
+      'agentproof-admin-key': {
+        principalId: 'admin-principal',
+        tenantId: '*',
+        principalType: 'SYSTEM',
+        permissions: ['*'],
+        authMethod: 'BEARER',
+        metadata: { role: 'admin' },
+      },
+    };
+
+    const envKey = process.env.AGENTPROOF_API_KEY;
+    if (envKey && !defaultPrincipals[envKey]) {
+      defaultPrincipals[envKey] = {
+        principalId: 'env-configured-agent',
+        tenantId: 'default-tenant',
+        principalType: 'AGENT',
+        permissions: [Permissions.VERIFY_EXECUTE, Permissions.TRACE_READ, Permissions.TRACE_WRITE],
+        authMethod: 'API_KEY',
+        metadata: { source: 'process.env.AGENTPROOF_API_KEY' },
+      };
+    }
+
+    this.identityProvider = options.identityProvider ?? new ContextIdentityProvider({ principals: defaultPrincipals });
+    this.authorizationService = options.authorizationService ?? new DefaultAuthorizationService();
+    this.secretProvider = options.secretProvider ?? new EnvironmentSecretProvider();
+    this.evidenceTrustValidator = options.evidenceTrustValidator ?? new EvidenceTrustValidator();
+    this.externalEvidenceAdapter = options.externalEvidenceAdapter ?? new ExternalEvidenceAdapter();
 
     // Seed default integrations if empty
     this.ensureDefaultIntegrations();
@@ -150,6 +271,36 @@ export class ConsoleApiHandler {
         // Safe ignore in test mocks
       }
     }
+
+    // Ensure real local customer REST integration is registered
+    const hasCustomerRest = this.integrationRegistry.getById('customer-service-rest', 'default-tenant');
+    if (!hasCustomerRest) {
+      try {
+        const customerServiceUrl = process.env.CUSTOMER_SERVICE_URL ?? 'http://localhost:4000';
+        const customerRestConfig = IntegrationConfigSchema.parse({
+          integrationId: 'customer-service-rest',
+          tenantId: 'default-tenant',
+          type: 'REST_API',
+          baseUrl: customerServiceUrl,
+          allowedResourcePatterns: ['/customers/*', '/api/customers/*'],
+          pathMapping: { customer: '/customers/{id}' },
+          auth: {
+            type: 'API_KEY',
+            secretRef: 'env://CUSTOMER_SERVICE_API_KEY',
+            headerName: 'x-api-key',
+          },
+          timeoutMs: 4000,
+          maxResponseSizeBytes: 1048576,
+          allowedMethods: ['GET', 'HEAD'],
+          allowLoopback: true,
+          enabled: true,
+          freshnessToleranceMs: 60000,
+        });
+        this.integrationRegistry.register(customerRestConfig);
+      } catch {
+        // Safe ignore
+      }
+    }
   }
 
   /**
@@ -187,6 +338,27 @@ export class ConsoleApiHandler {
 
       if (pathname === '/api/overview') {
         return await this.handleOverview(req, res, tenantId);
+      }
+
+      // V1 Authenticated Verification Endpoints
+      if (pathname === '/api/v1/verifications') {
+        if (method === 'POST') {
+          return await this.handleCreateVerificationV1(req, res);
+        }
+        if (method === 'GET') {
+          return await this.handleListVerificationsV1(req, res, url);
+        }
+      }
+
+      if (pathname.startsWith('/api/v1/verifications/')) {
+        const subpath = pathname.slice('/api/v1/verifications/'.length);
+        if (subpath.endsWith('/evidence') && method === 'GET') {
+          const verificationId = subpath.slice(0, -('/evidence'.length));
+          return await this.handleGetVerificationEvidenceV1(req, res, decodeURIComponent(verificationId));
+        }
+        if (subpath && method === 'GET') {
+          return await this.handleGetVerificationV1(req, res, decodeURIComponent(subpath));
+        }
       }
 
       if (pathname === '/api/verifications' || pathname === '/api/verifications/run') {
@@ -526,6 +698,8 @@ export class ConsoleApiHandler {
       conditionCount: t.result.conditionEvaluations?.length ?? 0,
       evidenceCount: t.evidence.length,
       durationMs: t.result.executionDurationMs,
+      isSimulation: t.request.intent.operation.includes('cancel_subscription') || t.traceId.includes('scn') || t.request.requestId.includes('sim'),
+      integrationId: t.evidence.find((e) => e.sourceKind === 'EXTERNAL_API')?.sourceId,
     }));
 
     this.sendJson(res, 200, {
@@ -1339,4 +1513,593 @@ export class ConsoleApiHandler {
     }
     this.sendJson(res, statusCode, errorBody);
   }
+
+  // --- V1 Authenticated Verification Handlers ---
+
+  private async authenticateV1(req: http.IncomingMessage): Promise<SecurityPrincipal> {
+    const authHeader = req.headers['authorization'] || req.headers['Authorization'];
+    const apiKeyHeader = req.headers['x-agentproof-api-key'] || req.headers['X-AgentProof-Api-Key'];
+    let token: string | undefined;
+
+    if (authHeader && typeof authHeader === 'string') {
+      token = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : authHeader.trim();
+    } else if (apiKeyHeader && typeof apiKeyHeader === 'string') {
+      token = apiKeyHeader.trim();
+    }
+
+    if (!token) {
+      throw new AuthenticationError(
+        'Authentication required: valid Bearer token or x-agentproof-api-key header must be provided.'
+      );
+    }
+
+    const headers: Record<string, string | undefined> = {};
+    for (const [k, v] of Object.entries(req.headers)) {
+      headers[k.toLowerCase()] = Array.isArray(v) ? v[0] : v;
+    }
+
+    return await this.identityProvider.resolvePrincipal({
+      token,
+      headers,
+    });
+  }
+
+  private async handleCreateVerificationV1(
+    req: http.IncomingMessage,
+    res: http.ServerResponse
+  ): Promise<void> {
+    let principal: SecurityPrincipal;
+    try {
+      principal = await this.authenticateV1(req);
+    } catch (err: any) {
+      this.sendError(res, 401, 'UNAUTHENTICATED', err.message ?? 'Authentication failed.');
+      return;
+    }
+
+    try {
+      this.authorizationService.authorizeOperation(principal, Permissions.VERIFY_EXECUTE);
+    } catch (err: any) {
+      this.sendError(res, 403, 'FORBIDDEN', err.message ?? 'Access denied.');
+      return;
+    }
+
+    const rawBody = await this.readJsonBody(req);
+    if (!rawBody || typeof rawBody !== 'object') {
+      this.sendError(res, 400, 'INVALID_BODY', 'Request body must be a valid JSON object.');
+      return;
+    }
+
+    // Reject client-supplied results or arbitrary URLs
+    if ('verdict' in rawBody || 'overallVerdict' in rawBody || 'result' in rawBody) {
+      this.sendError(
+        res,
+        400,
+        'INVALID_FIELD',
+        'Client cannot specify authoritative verdict or result in verification request.'
+      );
+      return;
+    }
+
+    const parsed = V1VerificationPayloadSchema.safeParse(rawBody);
+    if (!parsed.success) {
+      this.sendError(
+        res,
+        400,
+        'VALIDATION_FAILED',
+        'Verification request schema validation failed.',
+        parsed.error.format()
+      );
+      return;
+    }
+
+    const data = parsed.data;
+
+    // Enforce Tenant Isolation: bind target resource to principal's authorized tenant
+    let authorizedTenant: string;
+    try {
+      authorizedTenant = this.authorizationService.authorizeTenantScope(principal, data.target.tenantId);
+    } catch (err: any) {
+      this.sendError(res, 403, 'TENANT_ACCESS_DENIED', err.message ?? 'Tenant access denied.');
+      return;
+    }
+
+    const target: ResourceTarget = {
+      system: data.target.system,
+      resourceType: data.target.resourceType,
+      resourceId: data.target.resourceId,
+      tenantId: authorizedTenant,
+    };
+
+    const operation = data.intent?.operation || data.operation || 'verify_operation';
+    const summary = data.intent?.summary || `Verify ${operation}`;
+    const expectedChanges = data.intent?.expectedChanges || {};
+
+    const requestId = data.requestId ?? `req-${crypto.randomUUID().slice(0, 8)}`;
+    const nowIso = new Date().toISOString();
+
+    const request: VerificationRequest = {
+      schemaVersion: '1.0.0',
+      requestId,
+      timestamp: nowIso,
+      target,
+      intent: {
+        operation,
+        summary,
+        expectedChanges,
+      },
+      preconditions: (data.preconditions ?? []).map((p) => ({
+        id: p.id,
+        description: p.description,
+        path: p.path,
+        operator: p.operator as any,
+        expectedValue: p.expectedValue,
+        enforcement: p.enforcement as any,
+      })),
+      postconditions: data.postconditions.map((p) => ({
+        id: p.id,
+        description: p.description,
+        path: p.path,
+        operator: p.operator as any,
+        expectedValue: p.expectedValue,
+        enforcement: p.enforcement as any,
+      })),
+      policy: {
+        timeoutMs: data.policy?.timeoutMs ?? 5000,
+        requireIndependentSource: data.policy?.requireIndependentSource ?? true,
+        freshnessToleranceMs: data.policy?.freshnessToleranceMs ?? 60000,
+      },
+      metadata: data.metadata,
+    };
+
+    let actionRecord: ActionRecord | undefined;
+    if (data.action) {
+      actionRecord = {
+        actionId: data.action.actionId ?? `act-${crypto.randomUUID().slice(0, 8)}`,
+        toolName: data.action.toolName,
+        target,
+        sanitizedArgs: data.action.sanitizedArgs ?? {},
+        executionStatus: data.action.executionStatus as any,
+        reportedResult: data.action.reportedResult !== undefined ? data.action.reportedResult : null,
+        invokedAt: data.action.invokedAt ?? nowIso,
+        completedAt: data.action.completedAt ?? nowIso,
+        agentId: data.action.agentId,
+      };
+    }
+
+    const evidenceList: Evidence[] = [];
+
+    // If caller specified an external integrationId, resolve trusted configuration and read state independently
+    if (data.integrationId) {
+      const integration = this.integrationRegistry.getById(data.integrationId, authorizedTenant);
+      if (!integration) {
+        this.sendError(
+          res,
+          403,
+          'INTEGRATION_ACCESS_DENIED',
+          `Integration '${data.integrationId}' not found or not accessible within tenant '${authorizedTenant}'.`
+        );
+        return;
+      }
+
+      if (!integration.enabled) {
+        this.sendError(
+          res,
+          400,
+          'INTEGRATION_DISABLED',
+          `Integration '${data.integrationId}' is currently disabled.`
+        );
+        return;
+      }
+
+      let reader = this.integrationRegistry.getReader?.(data.integrationId, authorizedTenant);
+      if (!reader) {
+        if (integration.type === 'REST_API') {
+          reader = new RestApiStateReader(integration, { secretProvider: this.secretProvider });
+        } else if (integration.type === 'S3_STORAGE') {
+          reader = new S3ObjectStateReader(integration, { secretProvider: this.secretProvider });
+        } else if (integration.type === 'POSTGRES') {
+          reader = new PostgresStateReader(integration, { secretProvider: this.secretProvider });
+        }
+        if (reader) {
+          this.integrationRegistry.registerReader?.(reader);
+        }
+      }
+
+      if (!reader) {
+        this.sendError(
+          res,
+          500,
+          'READER_ERROR',
+          `Failed to initialize reader for integration type '${integration.type}'.`
+        );
+        return;
+      }
+
+      // Register the integration's sourceId with EvidenceTrustValidator
+      this.evidenceTrustValidator.registerTrustedSource(integration.integrationId);
+
+      // Perform independent external state observation
+      const observationRecord = await reader.readState(target);
+
+      // Convert observation to Evidence preserving failure metadata
+      const externalEvidence = this.externalEvidenceAdapter.toEvidence(observationRecord, {
+        includeFailureRecord: true,
+      });
+
+      if (externalEvidence) {
+        const trustReport = this.evidenceTrustValidator.validate(
+          externalEvidence,
+          target,
+          request.policy,
+          actionRecord
+        );
+        const combinedLimitations = Array.from(
+          new Set([...(externalEvidence.limitations ?? []), ...trustReport.limitations])
+        );
+
+        const validatedExtEv = EvidenceSchema.parse({
+          ...externalEvidence,
+          limitations: combinedLimitations,
+          provenance: {
+            ...externalEvidence.provenance,
+            trustLevel: trustReport.trustLevel,
+          },
+        }) as Evidence;
+
+        evidenceList.push(validatedExtEv);
+      }
+    }
+
+    // Process any caller-supplied additional evidence (validated through trust validator)
+    if (Array.isArray(data.evidence)) {
+      for (let i = 0; i < data.evidence.length; i++) {
+        const raw = data.evidence[i];
+        const observedAt = raw.observedAt ?? nowIso;
+        const computedHash = this.externalEvidenceAdapter.computePayloadHash(raw.observedPayload);
+
+        if (raw.integrityHash && raw.integrityHash !== computedHash) {
+          this.sendError(
+            res,
+            400,
+            'INTEGRITY_MISMATCH',
+            `Integrity hash mismatch on evidence item [${raw.evidenceId ?? i + 1}].`
+          );
+          return;
+        }
+
+        const tempEv: Evidence = {
+          evidenceId: raw.evidenceId ?? `ev-${crypto.randomUUID().slice(0, 8)}`,
+          evidenceType: (raw.evidenceType as any) ?? 'STATE_SNAPSHOT',
+          sourceId: raw.sourceId,
+          sourceKind: (raw.sourceKind as any) ?? 'DIRECT_READ',
+          target: {
+            system: raw.target.system,
+            resourceType: raw.target.resourceType,
+            resourceId: raw.target.resourceId,
+            tenantId: authorizedTenant,
+          },
+          observedPayload: raw.observedPayload !== undefined ? raw.observedPayload : null,
+          observedAt,
+          freshnessMs: raw.freshnessMs ?? 0,
+          integrityHash: computedHash,
+          limitations: raw.limitations ?? [],
+          digestAlgorithm: 'SHA-256',
+          canonicalizationVersion: 'v1',
+          schemaVersion: '1.0.0',
+          provenance: raw.provenance as any,
+          observationStatus: raw.observationStatus as any,
+        };
+
+        const trustReport = this.evidenceTrustValidator.validate(tempEv, target, request.policy, actionRecord);
+        const combinedLimitations = Array.from(
+          new Set([...(raw.limitations ?? []), ...trustReport.limitations])
+        );
+
+        const ev = EvidenceSchema.parse({
+          ...tempEv,
+          limitations: combinedLimitations,
+          provenance: {
+            ...raw.provenance,
+            trustLevel: trustReport.trustLevel,
+          },
+        }) as Evidence;
+
+        evidenceList.push(ev);
+      }
+    }
+
+    // Run deterministic verification engine
+    const result = await this.verifier.verify(request, evidenceList, actionRecord);
+
+    // Create durable trace
+    let trace: VerificationTrace;
+    if (this.verifier instanceof VerificationEngine && typeof (this.verifier as any).createTrace === 'function') {
+      trace = (this.verifier as VerificationEngine).createTrace(request, result, evidenceList, actionRecord);
+    } else {
+      trace = {
+        traceId: crypto.randomUUID(),
+        request: Object.freeze({ ...request }),
+        action: actionRecord ? Object.freeze({ ...actionRecord }) : undefined,
+        evidence: Object.freeze(evidenceList.map((e) => Object.freeze({ ...e }))),
+        result: Object.freeze({ ...result }),
+        recordedAt: nowIso,
+      };
+    }
+
+    // Persist trace
+    await this.traceRepository.saveForTenant(authorizedTenant, trace);
+
+    // Append to tamper-evident audit chain
+    await this.auditRepository.append(authorizedTenant, {
+      auditId: `aud_${trace.traceId}`,
+      eventType: 'VERIFICATION_EXECUTED',
+      entityId: trace.traceId,
+      payload: {
+        verdict: result.overallVerdict,
+        summary: result.summary,
+        operation: request.intent.operation,
+        integrationId: data.integrationId,
+      },
+    });
+
+    this.sendJson(res, 201, {
+      status: 'success',
+      verificationId: result.verificationId,
+      traceId: trace.traceId,
+      verdict: result.overallVerdict,
+      overallVerdict: result.overallVerdict,
+      summary: result.summary,
+      evaluatedAt: result.evaluatedAt,
+      target,
+      postconditions: result.conditionEvaluations ?? [],
+      conditionEvaluations: result.conditionEvaluations ?? [],
+      evidenceCount: evidenceList.length,
+      evidenceManifest: result.evidenceManifest ?? [],
+      executionDurationMs: result.executionDurationMs,
+      links: {
+        self: `/api/v1/verifications/${trace.traceId}`,
+        evidence: `/api/v1/verifications/${trace.traceId}/evidence`,
+      },
+    });
+  }
+
+  private async handleGetVerificationV1(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    verificationId: string
+  ): Promise<void> {
+    let principal: SecurityPrincipal;
+    try {
+      principal = await this.authenticateV1(req);
+    } catch (err: any) {
+      this.sendError(res, 401, 'UNAUTHENTICATED', err.message ?? 'Authentication failed.');
+      return;
+    }
+
+    try {
+      this.authorizationService.authorizeOperation(principal, Permissions.TRACE_READ);
+    } catch (err: any) {
+      this.sendError(res, 403, 'FORBIDDEN', err.message ?? 'Access denied.');
+      return;
+    }
+
+    // Search under authorized tenant scope (or '*' for wildcard)
+    let trace: VerificationTrace | null | undefined = await this.traceRepository.getByTenantAndId(principal.tenantId, verificationId);
+    if (!trace && principal.tenantId === '*') {
+      const all = await this.traceRepository.listByTenant('*', { limit: 500 });
+      trace = all.find((t) => t.traceId === verificationId || t.result.verificationId === verificationId);
+    }
+
+    if (!trace) {
+      // Check if trace exists under a different tenant to provide accurate 403 vs 404
+      const allTraces = await this.traceRepository.listByTenant('*', { limit: 500 });
+      const foreignTrace = allTraces.find(
+        (t) => t.traceId === verificationId || t.result.verificationId === verificationId
+      );
+      if (foreignTrace && foreignTrace.request.target.tenantId !== principal.tenantId) {
+        this.sendError(
+          res,
+          403,
+          'TENANT_ACCESS_DENIED',
+          `Access to verification trace '${verificationId}' denied by tenant isolation policy.`
+        );
+        return;
+      }
+      this.sendError(res, 404, 'NOT_FOUND', `Verification '${verificationId}' was not found.`);
+      return;
+    }
+
+    try {
+      this.authorizationService.authorizeTraceAccess(principal, trace);
+    } catch (err: any) {
+      this.sendError(res, 403, 'TENANT_ACCESS_DENIED', err.message ?? 'Access denied.');
+      return;
+    }
+
+    this.sendJson(res, 200, {
+      verificationId: trace.result.verificationId,
+      traceId: trace.traceId,
+      tenantId: trace.request.target.tenantId ?? principal.tenantId,
+      verdict: trace.result.overallVerdict,
+      overallVerdict: trace.result.overallVerdict,
+      summary: trace.result.summary,
+      evaluatedAt: trace.result.evaluatedAt,
+      recordedAt: trace.recordedAt,
+      executionDurationMs: trace.result.executionDurationMs,
+      target: trace.request.target,
+      intent: trace.request.intent,
+      postconditions: trace.request.postconditions,
+      conditionEvaluations: trace.result.conditionEvaluations ?? [],
+      evidenceManifest: trace.result.evidenceManifest ?? [],
+      evidenceCount: trace.evidence.length,
+      action: trace.action,
+      links: {
+        self: `/api/v1/verifications/${trace.traceId}`,
+        evidence: `/api/v1/verifications/${trace.traceId}/evidence`,
+      },
+    });
+  }
+
+  private async handleGetVerificationEvidenceV1(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    verificationId: string
+  ): Promise<void> {
+    let principal: SecurityPrincipal;
+    try {
+      principal = await this.authenticateV1(req);
+    } catch (err: any) {
+      this.sendError(res, 401, 'UNAUTHENTICATED', err.message ?? 'Authentication failed.');
+      return;
+    }
+
+    try {
+      this.authorizationService.authorizeOperation(principal, Permissions.TRACE_READ);
+    } catch (err: any) {
+      this.sendError(res, 403, 'FORBIDDEN', err.message ?? 'Access denied.');
+      return;
+    }
+
+    let trace: VerificationTrace | null | undefined = await this.traceRepository.getByTenantAndId(principal.tenantId, verificationId);
+    if (!trace && principal.tenantId === '*') {
+      const all = await this.traceRepository.listByTenant('*', { limit: 500 });
+      trace = all.find((t) => t.traceId === verificationId || t.result.verificationId === verificationId);
+    }
+
+    if (!trace) {
+      const allTraces = await this.traceRepository.listByTenant('*', { limit: 500 });
+      const foreignTrace = allTraces.find(
+        (t) => t.traceId === verificationId || t.result.verificationId === verificationId
+      );
+      if (foreignTrace && foreignTrace.request.target.tenantId !== principal.tenantId) {
+        this.sendError(
+          res,
+          403,
+          'TENANT_ACCESS_DENIED',
+          `Access to verification trace '${verificationId}' denied by tenant isolation policy.`
+        );
+        return;
+      }
+      this.sendError(res, 404, 'NOT_FOUND', `Verification '${verificationId}' was not found.`);
+      return;
+    }
+
+    try {
+      this.authorizationService.authorizeTraceAccess(principal, trace);
+    } catch (err: any) {
+      this.sendError(res, 403, 'TENANT_ACCESS_DENIED', err.message ?? 'Access denied.');
+      return;
+    }
+
+    const sanitizedEvidence = trace.evidence.map((e) => ({
+      evidenceId: e.evidenceId,
+      sourceId: e.sourceId,
+      sourceKind: e.sourceKind,
+      evidenceType: e.evidenceType,
+      target: e.target,
+      observedAt: e.observedAt,
+      freshnessMs: e.freshnessMs,
+      integrityHash: e.integrityHash,
+      observationStatus: e.observationStatus ?? 'FOUND',
+      trustLevel: e.provenance?.trustLevel ?? 'UNVERIFIED',
+      limitations: e.limitations ?? [],
+      observedPayload: this.redactSensitiveData(e.observedPayload),
+      provenance: {
+        observerIdentity: e.provenance?.observerIdentity,
+        observerType: e.provenance?.observerType,
+        trustLevel: e.provenance?.trustLevel,
+      },
+    }));
+
+    this.sendJson(res, 200, {
+      verificationId: trace.result.verificationId,
+      traceId: trace.traceId,
+      tenantId: trace.request.target.tenantId ?? principal.tenantId,
+      total: sanitizedEvidence.length,
+      evidence: sanitizedEvidence,
+    });
+  }
+
+  private async handleListVerificationsV1(
+    req: http.IncomingMessage,
+    res: http.ServerResponse,
+    url: URL
+  ): Promise<void> {
+    let principal: SecurityPrincipal;
+    try {
+      principal = await this.authenticateV1(req);
+    } catch (err: any) {
+      this.sendError(res, 401, 'UNAUTHENTICATED', err.message ?? 'Authentication failed.');
+      return;
+    }
+
+    try {
+      this.authorizationService.authorizeOperation(principal, Permissions.TRACE_READ);
+    } catch (err: any) {
+      this.sendError(res, 403, 'FORBIDDEN', err.message ?? 'Access denied.');
+      return;
+    }
+
+    const q = (url.searchParams.get('q') ?? '').toLowerCase().trim();
+    const verdict = url.searchParams.get('verdict') as 'PASS' | 'FAIL' | 'INCONCLUSIVE' | null;
+    const limit = Math.min(Math.max(parseInt(url.searchParams.get('limit') ?? '50', 10), 1), 100);
+    const offset = Math.max(parseInt(url.searchParams.get('offset') ?? '0', 10), 0);
+
+    const allTraces = await this.traceRepository.listByTenant(principal.tenantId, { limit: 500 });
+    const filtered = allTraces.filter((t) => {
+      if (verdict && t.result.overallVerdict !== verdict) return false;
+      if (q) {
+        const matchTraceId = t.traceId.toLowerCase().includes(q);
+        const matchOp = t.request.intent.operation.toLowerCase().includes(q);
+        const matchSys = t.request.target.system.toLowerCase().includes(q);
+        const matchRes = t.request.target.resourceId.toLowerCase().includes(q);
+        return matchTraceId || matchOp || matchSys || matchRes;
+      }
+      return true;
+    });
+
+    const paginated = filtered.slice(offset, offset + limit).map((t) => ({
+      verificationId: t.result.verificationId,
+      traceId: t.traceId,
+      operation: t.request.intent.operation,
+      summary: t.request.intent.summary,
+      target: t.request.target,
+      verdict: t.result.overallVerdict,
+      evaluatedAt: t.result.evaluatedAt,
+      resultSummary: t.result.summary,
+      conditionCount: t.result.conditionEvaluations?.length ?? 0,
+      evidenceCount: t.evidence.length,
+      durationMs: t.result.executionDurationMs,
+      links: {
+        self: `/api/v1/verifications/${t.traceId}`,
+        evidence: `/api/v1/verifications/${t.traceId}/evidence`,
+      },
+    }));
+
+    this.sendJson(res, 200, {
+      total: filtered.length,
+      limit,
+      offset,
+      items: paginated,
+    });
+  }
+
+  private redactSensitiveData(val: unknown): unknown {
+    if (val === null || val === undefined) return val;
+    if (typeof val !== 'object') return val;
+    if (Array.isArray(val)) {
+      return val.map((item) => this.redactSensitiveData(item));
+    }
+    const sensitiveKeys = ['authorization', 'secret', 'password', 'token', 'api_key', 'apikey', 'key'];
+    const result: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(val as Record<string, unknown>)) {
+      if (sensitiveKeys.some((s) => k.toLowerCase().includes(s))) {
+        result[k] = '[REDACTED]';
+      } else {
+        result[k] = this.redactSensitiveData(v);
+      }
+    }
+    return result;
+  }
 }
+

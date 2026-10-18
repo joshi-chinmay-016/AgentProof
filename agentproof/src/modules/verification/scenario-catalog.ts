@@ -143,7 +143,7 @@ export class ScenarioCatalog {
         id: 'SCENARIO_H',
         name: 'Multiple Required Conditions',
         description:
-          'Demonstrates Phase 2 FAIL > INCONCLUSIVE > PASS dominance rule across multiple postconditions.',
+          'Demonstrates FAIL > INCONCLUSIVE > PASS dominance rule across multiple postconditions.',
         failureMode: 'GENUINE_SUCCESS',
         expectedVerdict: 'FAIL',
         operation: 'cancel_and_convert_plan',

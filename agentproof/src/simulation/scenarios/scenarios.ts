@@ -600,7 +600,7 @@ export function createScenarioH_MultipleRequiredConditions(): ScenarioDefinition
   return {
     id: 'SCENARIO_H',
     name: 'Multiple Required Conditions',
-    description: 'Demonstrates Phase 2 FAIL > INCONCLUSIVE > PASS dominance rule across multiple postconditions.',
+    description: 'Demonstrates FAIL > INCONCLUSIVE > PASS dominance rule across multiple postconditions.',
     initialSubscriptions: [sub],
     actionInvocation: {
       toolName: 'cancel_and_convert_plan',

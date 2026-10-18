@@ -1112,6 +1112,17 @@
   // VIEW 2: VERIFICATION EXPLORER
   // ==========================================================================
   async function renderVerifications(outlet) {
+    let counts = { ALL: '–', PASS: '–', FAIL: '–', INCONCLUSIVE: '–' };
+    if (state.overviewData?.verdictDistribution) {
+      const dist = state.overviewData.verdictDistribution;
+      counts.PASS = dist.PASS ?? 0;
+      counts.FAIL = dist.FAIL ?? 0;
+      counts.INCONCLUSIVE = dist.INCONCLUSIVE ?? 0;
+      counts.ALL = (typeof counts.PASS === 'number' ? counts.PASS : 0) + 
+                   (typeof counts.FAIL === 'number' ? counts.FAIL : 0) + 
+                   (typeof counts.INCONCLUSIVE === 'number' ? counts.INCONCLUSIVE : 0);
+    }
+
     outlet.innerHTML = `
       <div class="page-container">
         <div class="page-header">
@@ -1127,15 +1138,37 @@
         <!-- Filter & Search Bar -->
         <div class="filter-bar">
           <div class="filter-group">
-            <span style="font-size: 12px; font-weight: 600; color: var(--text-muted);">Verdict:</span>
-            <button class="filter-pill ${state.verificationFilter === 'ALL' ? 'active' : ''}" data-filter="ALL">All</button>
-            <button class="filter-pill ${state.verificationFilter === 'PASS' ? 'active' : ''}" data-filter="PASS">PASS</button>
-            <button class="filter-pill ${state.verificationFilter === 'FAIL' ? 'active' : ''}" data-filter="FAIL">FAIL</button>
-            <button class="filter-pill ${state.verificationFilter === 'INCONCLUSIVE' ? 'active' : ''}" data-filter="INCONCLUSIVE">INCONCLUSIVE</button>
+            <span class="filter-group-label">Verdict:</span>
+            <div class="filter-segment-group" role="group" aria-label="Filter by Authoritative Verdict">
+              <button class="filter-pill ${state.verificationFilter === 'ALL' ? 'active' : ''}" data-filter="ALL" title="Show all verification runs">
+                <svg class="filter-glyph" viewBox="0 0 16 16"><rect x="2" y="2" width="5" height="5" rx="1"/><rect x="9" y="2" width="5" height="5" rx="1"/><rect x="2" y="9" width="5" height="5" rx="1"/><rect x="9" y="9" width="5" height="5" rx="1"/></svg>
+                <span>All</span>
+                <span class="filter-count" id="count-filter-all">${counts.ALL}</span>
+              </button>
+              <button class="filter-pill ${state.verificationFilter === 'PASS' ? 'active' : ''}" data-filter="PASS" title="Filter by PASS outcome">
+                <svg class="filter-glyph" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5 8.5l2 2 4-4"/></svg>
+                <span>PASS</span>
+                <span class="filter-count" id="count-filter-pass">${counts.PASS}</span>
+              </button>
+              <button class="filter-pill ${state.verificationFilter === 'FAIL' ? 'active' : ''}" data-filter="FAIL" title="Filter by FAIL outcome">
+                <svg class="filter-glyph" viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" rx="2"/><path d="M5.5 5.5l5 5M10.5 5.5l-5 5"/></svg>
+                <span>FAIL</span>
+                <span class="filter-count" id="count-filter-fail">${counts.FAIL}</span>
+              </button>
+              <button class="filter-pill ${state.verificationFilter === 'INCONCLUSIVE' ? 'active' : ''}" data-filter="INCONCLUSIVE" title="Filter by INCONCLUSIVE outcome">
+                <svg class="filter-glyph" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" stroke-dasharray="3 2"/><path d="M8 5.5a1.5 1.5 0 0 1 1.5 1.5c0 1-1.5 1.5-1.5 2.5m0 2h.01"/></svg>
+                <span>INCONCLUSIVE</span>
+                <span class="filter-count" id="count-filter-inconclusive">${counts.INCONCLUSIVE}</span>
+              </button>
+            </div>
           </div>
 
-          <div style="display: flex; align-items: center; gap: 0.5rem; width: 320px;">
-            <input type="text" class="form-input" id="v-search-input" placeholder="Search by trace ID, operation, system..." value="${escapeHtml(state.searchQuery)}" style="width: 100%;">
+          <div class="filter-search-wrapper">
+            <svg class="filter-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <input type="text" class="filter-search-input" id="v-search-input" placeholder="Search by trace ID, operation, system..." value="${escapeHtml(state.searchQuery)}">
           </div>
         </div>
 
@@ -1172,6 +1205,25 @@
         renderVerifications(outlet);
       });
     });
+
+    // Ensure counts are updated dynamically
+    api.get('/api/overview').then((overview) => {
+      state.overviewData = overview;
+      if (overview?.verdictDistribution) {
+        const p = overview.verdictDistribution.PASS || 0;
+        const f = overview.verdictDistribution.FAIL || 0;
+        const inc = overview.verdictDistribution.INCONCLUSIVE || 0;
+        const all = p + f + inc;
+        const elAll = document.getElementById('count-filter-all');
+        const elPass = document.getElementById('count-filter-pass');
+        const elFail = document.getElementById('count-filter-fail');
+        const elInc = document.getElementById('count-filter-inconclusive');
+        if (elAll) elAll.textContent = String(all);
+        if (elPass) elPass.textContent = String(p);
+        if (elFail) elFail.textContent = String(f);
+        if (elInc) elInc.textContent = String(inc);
+      }
+    }).catch(() => {});
 
     // Search input
     const searchInput = document.getElementById('v-search-input');
@@ -1491,22 +1543,22 @@
         }
 
         container.innerHTML = res.items.map((ev) => `
-          <div style="padding: 0.9rem; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-md); margin-bottom: 0.75rem;">
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.4rem;">
+          <div class="evidence-observation-card" style="padding: 1rem; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-sm); margin-bottom: 1rem; overflow: hidden; box-sizing: border-box;">
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.5rem; gap: 0.5rem; flex-wrap: wrap;">
               <span style="font-weight: 700; color: var(--text-primary); font-family: var(--font-mono); font-size: 12px;">${escapeHtml(ev.evidenceId)}</span>
-              <div style="display: flex; align-items: center; gap: 0.4rem;">
+              <div style="display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0;">
                 ${getObservationBadgeHtml(ev.observationStatus || 'FOUND')}
-                <span class="verdict-badge" style="background: var(--accent-subtle); color: var(--accent); border: 1px solid var(--accent-glow);">${escapeHtml(ev.trustLevel)}</span>
+                <span class="verdict-badge" style="background: var(--accent-subtle); color: var(--accent); border: 1px solid var(--accent-border);">${escapeHtml(ev.trustLevel || 'UNVERIFIED')}</span>
               </div>
             </div>
-            <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 0.25rem;">
+            <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 0.35rem; line-height: 1.4;">
               Source: <strong>${escapeHtml(ev.sourceId)}</strong> (${escapeHtml(ev.sourceKind)}) • Freshness: verified within window
             </div>
-            <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); word-break: break-all;">
+            <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); word-break: break-all; margin-bottom: 0.6rem; line-height: 1.4;">
               Hash: ${escapeHtml(ev.integrityHash)}
             </div>
             <div style="margin-top: 0.5rem;">
-              <pre class="code-viewer" style="max-height: 80px; padding: 0.5rem; font-size: 11px;">${escapeHtml(JSON.stringify(ev.observedPayload, null, 2))}</pre>
+              <pre class="code-viewer" style="max-height: 140px; overflow-x: auto; overflow-y: auto; padding: 0.6rem 0.75rem; font-size: 11px; line-height: 1.45; background: var(--bg-surface-sunken); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); margin: 0; box-sizing: border-box;">${escapeHtml(JSON.stringify(ev.observedPayload, null, 2))}</pre>
             </div>
           </div>
         `).join('');
@@ -2013,18 +2065,18 @@
           <h4 style="font-size: 13px; font-weight: 700; color: var(--text-primary); margin-bottom: 0.5rem;">Supporting Independent Evidence (${trace.evidence.length})</h4>
           <div style="display: flex; flex-direction: column; gap: 0.5rem;">
             ${trace.evidence.map((ev) => `
-              <div style="padding: 0.85rem; background: var(--bg-surface); border-radius: var(--radius-md); border: 1px solid var(--border-subtle);">
-                <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div style="padding: 0.85rem; background: var(--bg-surface); border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); overflow: hidden; box-sizing: border-box;">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; flex-wrap: wrap;">
                   <span style="font-weight: 700; font-family: var(--font-mono); font-size: 12px;">${escapeHtml(ev.evidenceId)}</span>
-                  <div style="display: flex; align-items: center; gap: 0.4rem;">
+                  <div style="display: flex; align-items: center; gap: 0.4rem; flex-shrink: 0;">
                     ${getObservationBadgeHtml(ev.observationStatus || 'FOUND')}
-                    <span class="verdict-badge" style="background: var(--accent-subtle); color: var(--accent);">${escapeHtml(ev.provenance?.trustLevel || 'UNVERIFIED')}</span>
+                    <span class="verdict-badge" style="background: var(--accent-subtle); color: var(--accent); border: 1px solid var(--accent-border);">${escapeHtml(ev.provenance?.trustLevel || 'UNVERIFIED')}</span>
                   </div>
                 </div>
-                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
+                <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px; line-height: 1.4;">
                   Source: <strong>${escapeHtml(ev.sourceId)}</strong> (${escapeHtml(ev.sourceKind)}) • Freshness: verified within window
                 </div>
-                <pre class="code-viewer" style="margin-top: 0.5rem; max-height: 100px;">${escapeHtml(JSON.stringify(ev.observedPayload, null, 2))}</pre>
+                <pre class="code-viewer" style="margin-top: 0.5rem; max-height: 140px; overflow-x: auto; overflow-y: auto; padding: 0.6rem 0.75rem;">${escapeHtml(JSON.stringify(ev.observedPayload, null, 2))}</pre>
               </div>
             `).join('')}
           </div>
@@ -2035,7 +2087,7 @@
             <h4 style="font-size: 13px; font-weight: 700; color: var(--text-primary);">Raw Verification Trace</h4>
             <button class="btn btn-secondary btn-sm" id="copy-trace-btn">Copy JSON</button>
           </div>
-          <pre class="code-viewer" id="raw-trace-code" style="max-height: 200px;">${escapeHtml(JSON.stringify(trace.rawTrace, null, 2))}</pre>
+          <pre class="code-viewer" id="raw-trace-code" style="max-height: 250px; overflow-x: auto; overflow-y: auto; padding: 0.6rem 0.75rem;">${escapeHtml(JSON.stringify(trace.rawTrace, null, 2))}</pre>
         </div>
       `;
 

@@ -247,6 +247,53 @@ code, pre, kbd, samp, .font-mono, [data-tabular] {
   letter-spacing: -0.01em;
 }
 
+/* Monospace Code Viewer Container with strict containment */
+.code-viewer {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  background-color: var(--bg-surface-sunken);
+  color: var(--text-primary);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  margin: 0;
+  overflow-x: auto !important;
+  overflow-y: auto !important;
+  white-space: pre;
+  word-break: normal;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.code-viewer::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.code-viewer::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.code-viewer::-webkit-scrollbar-thumb {
+  background-color: var(--border-subtle);
+  border-radius: var(--radius-sm);
+}
+
+.code-viewer::-webkit-scrollbar-thumb:hover {
+  background-color: var(--border-strong);
+}
+
+.evidence-observation-card {
+  padding: 1rem;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-4);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
 /* ----------------------------------------------------------------------------
    CONSOLE APPLICATION LAYOUT & SHELL
    ---------------------------------------------------------------------------- */
@@ -1295,34 +1342,218 @@ code, pre, kbd, samp, .font-mono, [data-tabular] {
 }
 
 /* ----------------------------------------------------------------------------
-   INPUTS & FILTER BAR
+   INPUTS & FILTER BAR (Segmented Verdict Controls & Editorial Search)
    ---------------------------------------------------------------------------- */
 .filter-bar {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2);
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
   border: 1px solid var(--border-hairline);
   border-radius: var(--radius-sm);
   background: var(--bg-surface);
-  margin-bottom: var(--space-3);
+  margin-bottom: var(--space-4);
   flex-wrap: wrap;
 }
 
-.search-input {
-  flex: 1;
-  min-width: 180px;
-  height: 32px;
-  background: transparent;
-  border: none;
-  font-family: var(--font-sans);
-  font-size: var(--text-sm);
-  color: var(--text-primary);
-  outline: none;
-  padding: 0 var(--space-2);
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
 }
 
-.search-input::placeholder {
+.filter-group-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  user-select: none;
+}
+
+.filter-segment-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  background: var(--bg-surface-sunken);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-sm);
+}
+
+.filter-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid transparent;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+  white-space: nowrap;
+  transition: all var(--duration-160) var(--ease-standard);
+  position: relative;
+}
+
+.filter-pill:hover {
+  color: var(--text-primary);
+  background: var(--bg-surface-hover);
+  border-color: var(--border-hairline);
+}
+
+.filter-pill:active {
+  transform: translateY(1px);
+}
+
+.filter-pill:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.filter-pill .filter-glyph {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.85;
+}
+
+.filter-pill .filter-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--bg-surface-raised);
+  border: 1px solid var(--border-hairline);
+  color: var(--text-muted);
+  line-height: 1.2;
+  margin-left: 2px;
+  transition: all var(--duration-160) var(--ease-standard);
+}
+
+/* ALL Button */
+.filter-pill[data-filter="ALL"].active {
+  background: var(--accent-subtle);
+  border-color: var(--accent-border);
+  color: var(--accent);
+  box-shadow: 0 1px 2px rgba(200, 90, 50, 0.08);
+}
+.filter-pill[data-filter="ALL"].active .filter-count {
+  background: rgba(200, 90, 50, 0.15);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+/* PASS Button */
+.filter-pill[data-filter="PASS"]:hover {
+  color: var(--verdict-pass);
+  background: var(--verdict-pass-bg);
+  border-color: var(--verdict-pass-border);
+}
+.filter-pill[data-filter="PASS"].active {
+  background: var(--verdict-pass-bg);
+  border-color: var(--verdict-pass-border);
+  color: var(--verdict-pass);
+  box-shadow: 0 1px 3px rgba(35, 100, 62, 0.15);
+}
+.filter-pill[data-filter="PASS"].active .filter-count {
+  background: rgba(35, 100, 62, 0.2);
+  border-color: var(--verdict-pass-border);
+  color: var(--verdict-pass);
+}
+
+/* FAIL Button */
+.filter-pill[data-filter="FAIL"]:hover {
+  color: var(--verdict-fail);
+  background: var(--verdict-fail-bg);
+  border-color: var(--verdict-fail-border);
+}
+.filter-pill[data-filter="FAIL"].active {
+  background: var(--verdict-fail-bg);
+  border-color: var(--verdict-fail-border);
+  color: var(--verdict-fail);
+  box-shadow: 0 1px 3px rgba(158, 42, 43, 0.15);
+}
+.filter-pill[data-filter="FAIL"].active .filter-count {
+  background: rgba(158, 42, 43, 0.2);
+  border-color: var(--verdict-fail-border);
+  color: var(--verdict-fail);
+}
+
+/* INCONCLUSIVE Button */
+.filter-pill[data-filter="INCONCLUSIVE"]:hover {
+  color: var(--verdict-inconclusive);
+  background: var(--verdict-inconclusive-bg);
+  border-color: var(--verdict-inconclusive-border);
+}
+.filter-pill[data-filter="INCONCLUSIVE"].active {
+  background: var(--verdict-inconclusive-bg);
+  border-color: var(--verdict-inconclusive-border);
+  color: var(--verdict-inconclusive);
+  box-shadow: 0 1px 3px rgba(154, 107, 31, 0.15);
+}
+.filter-pill[data-filter="INCONCLUSIVE"].active .filter-count {
+  background: rgba(154, 107, 31, 0.2);
+  border-color: var(--verdict-inconclusive-border);
+  color: var(--verdict-inconclusive);
+}
+
+/* Search Box Container */
+.filter-search-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 320px;
+  max-width: 100%;
+}
+
+.filter-search-icon {
+  position: absolute;
+  left: 10px;
+  width: 14px;
+  height: 14px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.filter-search-input {
+  width: 100%;
+  height: 34px;
+  padding: 0 var(--space-3) 0 32px;
+  background: var(--bg-surface-raised);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  outline: none;
+  transition: all var(--duration-160) var(--ease-standard);
+}
+
+.filter-search-input:focus {
+  border-color: var(--accent);
+  box-shadow: var(--focus-ring);
+  background: var(--bg-surface);
+}
+
+.filter-search-input::placeholder {
   color: var(--text-muted);
 }
 
